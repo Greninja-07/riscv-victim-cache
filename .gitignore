@@ -10,11 +10,3 @@ cache_sim
 sim_l1
 sim_test
 *.vcd
-*.vcd
-*.vvp
-*.out
-*.wlf
-*.log
-work/
-__pycache__/
-*.pyc
