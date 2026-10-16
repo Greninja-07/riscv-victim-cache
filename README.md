@@ -16,6 +16,47 @@
 
 ---
 
+## Repository Directory Structure
+
+```text
+riscv-victim-cache/
+├── rtl/
+│   ├── core/         # RV32I/M CPU pipeline (opcode.vh, IF_ID.v, execute.v, muldiv.v, wb.v, pipeline.v)
+│   ├── mem/          # Memory subsystem (l1_cache_controller.v, main_memory.v, memory.v)
+│   ├── victim/       # Victim cache subsystem (.gitkeep)
+│   ├── prefetch/     # Stride prefetcher subsystem (.gitkeep)
+│   ├── perf/         # Hardware performance counters (.gitkeep)
+│   └── top/          # FPGA top-level wrapper (top_fpga.v)
+├── tb/               # Testbenches (tb.v, tb_md.v, tb_l1_cache.v, opcode_STUB_for_sim_only.vh)
+├── scripts/          # Python verification & simulation tools (asm.py, md_test.py, md_test_golden.py, sys_test.py)
+├── sw/               # Software workloads (.gitkeep)
+├── constraints/      # FPGA constraints (.xdc) (.gitkeep)
+├── docs/             # Reports, architecture diagrams, TA notes (.gitkeep)
+├── Makefile          # Unified build and simulation targets
+└── README.md
+```
+
+---
+
+## Build & Simulation Commands
+
+All simulations can be run using the top-level `Makefile`:
+
+```bash
+# Run all testbenches
+make test_all
+
+# Run individual testbenches
+make sim_l1      # L1 Data Cache & Configurable Main Memory unit testbench
+make sim_md      # RV32M Hardware Multiplier & Divider tests against golden model
+make sim_cpu     # RV32M Pipelined CPU core execution testbench
+
+# Clean simulation artifacts
+make clean
+```
+
+---
+
 ## Week 1 Milestone Deliverable (5 – 11 Oct)
 
 ### Direct-Mapped L1 Data Cache & Configurable Main Memory Model
@@ -120,7 +161,7 @@ graph TB
 
 ### 3. Module Interfaces
 
-#### `l1_cache_controller.v`
+#### `rtl/mem/l1_cache_controller.v`
 ```verilog
 module l1_cache_controller #(
     parameter DATA_WIDTH  = 32,
@@ -161,7 +202,7 @@ module l1_cache_controller #(
 );
 ```
 
-#### `main_memory.v`
+#### `rtl/mem/main_memory.v`
 Configurable latency memory model simulating DRAM / off-chip latency:
 * **Board Switch Selectable Latency (`latency_sel [1:0]`):**
   * `2'b00` : **$N = 1$ cycle** (Baseline reference: reproduces zero-cache-benefit baseline)
@@ -175,7 +216,7 @@ Configurable latency memory model simulating DRAM / off-chip latency:
 
 ### 4. Verification & Testbench Results
 
-The self-checking testbench (`tb_l1_cache.v`) rigorously tests all cache operations against `main_memory.v`:
+The self-checking testbench (`tb/tb_l1_cache.v`) rigorously tests all cache operations against `rtl/mem/main_memory.v`:
 
 1. **Test 1: Cold Read Miss:** Verifies miss detection, asserts `mem_req`, stalls CPU for memory latency ($N=10$), refills 128-bit block, and releases CPU stall.
 2. **Test 2: Spatial Locality Hits:** Verifies consecutive reads to Words 1, 2, and 3 in the same 16-byte block complete with **0 stall cycles**.
@@ -187,8 +228,11 @@ The self-checking testbench (`tb_l1_cache.v`) rigorously tests all cache operati
 
 #### Simulation Command:
 ```bash
-# Compile and run with Icarus Verilog
-iverilog -o sim_l1 l1_cache_controller.v main_memory.v tb_l1_cache.v
+# Compile and run with Makefile:
+make sim_l1
+
+# Or compile and run directly with Icarus Verilog:
+iverilog -g2005 -o sim_l1 rtl/mem/l1_cache_controller.v rtl/mem/main_memory.v tb/tb_l1_cache.v
 vvp sim_l1
 
 # View waveforms in GTKWave
@@ -247,4 +291,4 @@ gtkwave waveform.vcd
 ---
 
 ## Next Week Handoff (Week 2: 12 – 18 Oct)
-* **Integration with Manas:** `l1_cache_controller.v` will interface with the `dmem_*` signals in `pipeline.v`. `cpu_stall` will connect to Manas's Unified Hazard Detection Unit to stall the RV32I pipeline during cache misses.
+* **Integration with Manas:** `rtl/mem/l1_cache_controller.v` will interface with the `dmem_*` signals in `rtl/core/pipeline.v`. `cpu_stall` will connect to Manas's Unified Hazard Detection Unit to stall the RV32I pipeline during cache misses.
