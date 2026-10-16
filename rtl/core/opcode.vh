@@ -15,6 +15,7 @@ localparam  [31: 0] NOP        = 32'h0000_0013;     // addi x0, x0, 0
 localparam  [6:0] RV32M_FUNCT7 = 7'b0000001;
 
 localparam  [ 6: 0] LUI     = 7'b0110111,        // U-type
+                    AUIPC   = 7'b0010111,        // U-type
                     JAL     = 7'b1101111,        // J-type
                     JALR    = 7'b1100111,        // I-type
                     BRANCH  = 7'b1100011,        // B-type
