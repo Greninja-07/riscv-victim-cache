@@ -3,7 +3,7 @@
 module execute
 #(
     parameter [31:0] RESET = 32'h0000_0000,
-    parameter        MUL_FAST = 0
+    parameter        MUL_FAST = 1
 )
 (
     input clk,
