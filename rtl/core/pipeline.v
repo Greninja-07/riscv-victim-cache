@@ -6,7 +6,8 @@
 // `include "wb.v"
 
 module pipe #(
-    parameter [31:0]            RESET = 32'h0000_0000
+    parameter [31:0]            RESET = 32'h0000_0000,
+    parameter                   MUL_FAST = 0
 )(
     input                   clk,
     input                   reset,
@@ -56,7 +57,7 @@ module pipe #(
     wire                jalr;
     wire                branch;
     reg                 stall_read;
-    reg         [31: 0] instruction;     // registered: holds last valid instruction
+    wire        [31: 0] instruction;     // holds instruction presented to ID
     wire        [31: 0] if_instruction_muxed; // combinational IF-mux output from IF_ID
     wire        [31: 0] reg_rdata2;
     wire        [31: 0] reg_rdata1;
@@ -159,15 +160,8 @@ IF_ID IF_ID_stage (
     .instruction_o      (if_instruction_muxed)  // PL-1 fix: separate from instruction_i
 );
 
-// PL-1 fix: register the IF mux output to break the combinational loop.
-// instruction holds the last instruction presented to the ID stage.
-// When not stalled, latch the current mux output.
-always @(posedge clk or negedge reset) begin
-    if (!reset)
-        instruction <= 32'h0000_0013; // NOP on reset
-    else if (!stall_read && !md_stall)
-        instruction <= if_instruction_muxed;
-end
+// instruction holds the instruction presented to the ID stage.
+assign instruction = if_instruction_muxed;
 
 ////////////////////////////////////////////////////////////
 //TODO : Register File Forwarding
@@ -181,14 +175,14 @@ end
 
 assign reg_rdata1 =
     (src1_select == 5'd0) ? 32'd0 : //TODO replaced
-    (!wb_stall && wb_alu_to_reg &&
+    (wb_alu_to_reg &&
     (wb_dest_reg_sel == src1_select))
         ? (wb_mem_to_reg ? wb_read_data : wb_result)
         : regs[src1_select]; //TODO replaced
 
 assign reg_rdata2 = //TODO replaced
     (src2_select == 5'd0) ? 32'd0 : 
-    (!wb_stall && wb_alu_to_reg &&
+    (wb_alu_to_reg &&
     (wb_dest_reg_sel == src2_select))
         ? (wb_mem_to_reg ? wb_read_data : wb_result)
         : regs[src2_select]; 
@@ -214,7 +208,7 @@ always @(posedge clk or negedge reset) begin
             regs[i] <= 32'd0; //TODO replaced
     end
     //bugfix: explicitly protect against writing to register 0
-    else if (wb_alu_to_reg && !stall_read && !wb_stall && wb_dest_reg_sel != 5'd0) begin 
+    else if (wb_alu_to_reg && !stall_read && wb_dest_reg_sel != 5'd0) begin 
         regs[wb_dest_reg_sel] <=
             wb_mem_to_reg ? wb_read_data : wb_result; //TODO replaced
     end
@@ -231,7 +225,10 @@ always @(posedge clk or negedge reset) begin
 end
 
 // instantiating execute module -----------------------------------
-execute execute (
+execute #(
+    .RESET(RESET),
+    .MUL_FAST(MUL_FAST)
+) execute (
     // -----------------
     // Clock / Reset
     // -----------------
