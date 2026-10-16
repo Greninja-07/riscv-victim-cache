@@ -1,4 +1,10 @@
 import random, subprocess, sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+TB_MD = str(REPO_ROOT / 'tb' / 'tb_md.v')
+MULDIV = str(REPO_ROOT / 'rtl' / 'core' / 'muldiv.v')
+
 M=0xffffffff
 def s32(x): x&=M; return x-(1<<32) if x>>31 else x
 def golden(f,a,b):
@@ -30,7 +36,7 @@ for _ in range(4000):
 open('md_vec.txt','w').write(''.join('%x %08x %08x\n'%v for v in vec))
 bad=0; cyc={}
 for fast in (0,1):
-    subprocess.run(['iverilog','-g2005','-P','tb_md.FAST=%d'%fast,'-o','md%d'%fast,'tb_md.v','muldiv.v'],check=True)
+    subprocess.run(['iverilog','-g2005','-P','tb_md.FAST=%d'%fast,'-o','md%d'%fast,TB_MD,MULDIV],check=True)
     out=subprocess.run(['vvp','md%d'%fast],capture_output=True,text=True).stdout.split('\n')
     rs=[l.split() for l in out if l.startswith('R ')]
     assert len(rs)==len(vec),(len(rs),len(vec))

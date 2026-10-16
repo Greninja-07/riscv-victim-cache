@@ -8,5 +8,25 @@
 # Simulation executables & temporary artifacts
 cache_sim
 sim_l1
+sim_cpu
 sim_test
+md0
+md1
 *.vcd
+*.vvp
+md_vec.txt
+*.hex
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+
+# Vivado outputs
+*.jou
+*.log
+.Xil/
+*.runs/
+*.cache/
+*.hw/
+*.ip_user_files/
+*.sim/
