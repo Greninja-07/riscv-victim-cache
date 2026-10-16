@@ -6,7 +6,8 @@
 // `include "wb.v"
 
 module pipe #(
-    parameter [31:0]            RESET = 32'h0000_0000
+    parameter [31:0]            RESET = 32'h0000_0000,
+    parameter                   MUL_FAST = 0
 )(
     input                   clk,
     input                   reset,
@@ -224,7 +225,10 @@ always @(posedge clk or negedge reset) begin
 end
 
 // instantiating execute module -----------------------------------
-execute execute (
+execute #(
+    .RESET(RESET),
+    .MUL_FAST(MUL_FAST)
+) execute (
     // -----------------
     // Clock / Reset
     // -----------------

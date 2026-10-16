@@ -2,7 +2,8 @@
 
 module execute
 #(
-    parameter [31:0] RESET = 32'h0000_0000
+    parameter [31:0] RESET = 32'h0000_0000,
+    parameter        MUL_FAST = 0
 )
 (
     input clk,
@@ -102,7 +103,7 @@ wire md_valid   = muldiv && !branch_stall;
 assign md_stall = md_valid && !md_done;
 wire md_advance = !stall_read && !md_stall;     // EX/MEM register is loaded this cycle
 
-muldiv_unit #(.MUL_FAST(0)) u_muldiv (         // MUL_FAST = 1 -> single-cycle DSP multiply
+muldiv_unit #(.MUL_FAST(MUL_FAST)) u_muldiv (         // MUL_FAST = 1 -> single-cycle DSP multiply
     .clk     (clk),
     .reset_n (reset),
     .valid   (md_valid),
