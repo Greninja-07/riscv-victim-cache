@@ -132,7 +132,7 @@ def run(seed, fast, nbody=50):
     # a branch skip can run past end of body: pad with 4 NOP-ish addi x0
     pad=[addi(0,0,0)]*4
     words=[w for w,_ in setup]+[w for w,_ in body]+pad+tail+[j(0,0)]
-    write_hex('imem.hex',words); write_hex('dmem.hex',[0]*1024)
+    write_hex('imem.hex',words); write_hex('dmem.hex',[0]*4096)
     exp=dict(mem)
     for r_ in range(1,8): exp[0x200+4*r_]=regs[r_]
     nm=sum(1 for _,t in body if t[0]=='m')
