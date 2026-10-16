@@ -284,7 +284,8 @@ always @(posedge clk or negedge reset_n) begin
         ex_mem_read_address  <= 2'h0;
         ex_mem_alu_operation <= 3'h0;
     end
-    else if (!stall_n) begin
+    // stall_n is active-low: 0 = hold (stalled), 1 = update (advance)
+    else if (stall_n) begin
         ex_mem_result        <= ex_result;//todo
         ex_mem_mem_write     <= mem_write;//todo
         ex_mem_alu_to_reg    <= alu_to_reg;//todo
