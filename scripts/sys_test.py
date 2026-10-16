@@ -146,3 +146,5 @@ if __name__=='__main__':
     for sd in range(N):
         if not run(sd,sim): bad+=1
     print(sim,'random programs:',N,'failed:',bad)
+    if bad != 0:
+        sys.exit(1)
