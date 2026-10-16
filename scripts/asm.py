@@ -22,6 +22,6 @@ def li(rd,val):
     if lo>=0x800: lo-=0x1000
     hi=((val-lo)>>12)&0xfffff
     return [lui(rd,hi),addi(rd,rd,lo)]
-def write_hex(path,words,size=1024):
+def write_hex(path,words,size=4096):
     words=list(words)+[0x13]*(size-len(words))
     open(path,'w').write('\n'.join('%08x'%(w&0xffffffff) for w in words)+'\n')

@@ -15,4 +15,4 @@ if __name__ == '__main__':
         j(0, 0)
     ]
     write_hex('imem.hex', words)
-    write_hex('dmem.hex', [0] * 1024)
+    write_hex('dmem.hex', [0] * 4096)
