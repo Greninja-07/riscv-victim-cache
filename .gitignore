@@ -30,3 +30,6 @@ __pycache__/
 *.hw/
 *.ip_user_files/
 *.sim/
+
+# Scratch directory
+scratch/
