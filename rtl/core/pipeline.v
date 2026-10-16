@@ -175,14 +175,14 @@ assign instruction = if_instruction_muxed;
 
 assign reg_rdata1 =
     (src1_select == 5'd0) ? 32'd0 : //TODO replaced
-    (!wb_stall && wb_alu_to_reg &&
+    (wb_alu_to_reg &&
     (wb_dest_reg_sel == src1_select))
         ? (wb_mem_to_reg ? wb_read_data : wb_result)
         : regs[src1_select]; //TODO replaced
 
 assign reg_rdata2 = //TODO replaced
     (src2_select == 5'd0) ? 32'd0 : 
-    (!wb_stall && wb_alu_to_reg &&
+    (wb_alu_to_reg &&
     (wb_dest_reg_sel == src2_select))
         ? (wb_mem_to_reg ? wb_read_data : wb_result)
         : regs[src2_select]; 
@@ -208,7 +208,7 @@ always @(posedge clk or negedge reset) begin
             regs[i] <= 32'd0; //TODO replaced
     end
     //bugfix: explicitly protect against writing to register 0
-    else if (wb_alu_to_reg && !stall_read && !wb_stall && wb_dest_reg_sel != 5'd0) begin 
+    else if (wb_alu_to_reg && !stall_read && wb_dest_reg_sel != 5'd0) begin 
         regs[wb_dest_reg_sel] <=
             wb_mem_to_reg ? wb_read_data : wb_result; //TODO replaced
     end
