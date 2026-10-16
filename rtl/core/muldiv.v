@@ -30,7 +30,7 @@
 //                INT_MIN / -1 = INT_MIN       INT_MIN % -1 = 0
 //////////////////////////////////////////////////////////////////////////////
 module muldiv_unit #(
-    parameter MUL_FAST = 0
+    parameter MUL_FAST = 1
 )(
     input         clk,
     input         reset_n,
