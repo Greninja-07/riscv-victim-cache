@@ -56,7 +56,7 @@ module pipe #(
     wire                jalr;
     wire                branch;
     reg                 stall_read;
-    reg         [31: 0] instruction;     // registered: holds last valid instruction
+    wire        [31: 0] instruction;     // holds instruction presented to ID
     wire        [31: 0] if_instruction_muxed; // combinational IF-mux output from IF_ID
     wire        [31: 0] reg_rdata2;
     wire        [31: 0] reg_rdata1;
@@ -159,15 +159,8 @@ IF_ID IF_ID_stage (
     .instruction_o      (if_instruction_muxed)  // PL-1 fix: separate from instruction_i
 );
 
-// PL-1 fix: register the IF mux output to break the combinational loop.
-// instruction holds the last instruction presented to the ID stage.
-// When not stalled, latch the current mux output.
-always @(posedge clk or negedge reset) begin
-    if (!reset)
-        instruction <= 32'h0000_0013; // NOP on reset
-    else if (!stall_read && !md_stall)
-        instruction <= if_instruction_muxed;
-end
+// instruction holds the instruction presented to the ID stage.
+assign instruction = if_instruction_muxed;
 
 ////////////////////////////////////////////////////////////
 //TODO : Register File Forwarding
