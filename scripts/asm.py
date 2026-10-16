@@ -9,6 +9,7 @@ def j(rd,imm):
     imm&=0x1fffff
     return (((imm>>20)&1)<<31)|(((imm>>1)&0x3ff)<<21)|(((imm>>11)&1)<<20)|(((imm>>12)&0xff)<<12)|(rd<<7)|0x6f
 def lui(rd,imm20): return ((imm20&0xfffff)<<12)|(rd<<7)|0x37
+def auipc(rd,imm20): return ((imm20&0xfffff)<<12)|(rd<<7)|0x17
 def addi(rd,rs1,imm): return i(0x13,0,rd,rs1,imm)
 def lw(rd,rs1,imm): return i(0x03,2,rd,rs1,imm)
 def sw(rs2,rs1,imm): return s(2,rs1,rs2,imm)

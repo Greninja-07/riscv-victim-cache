@@ -36,6 +36,7 @@
     output                   alu_w,
     output                   muldiv_w,        // RV32M instruction (opcode ARITHR, funct7 = 0000001)
     output                   lui_w,
+    output                   auipc_w,
     output                   jal_w,
     output                   jalr_w,
     output                   branch_w,
@@ -201,12 +202,13 @@ always @(*) begin
 
 
         //-----------------------------------------------------
-        // LUI
+        // LUI / AUIPC
         //-----------------------------------------------------
         // Upper 20 bits = instruction_i[31:12]
         // Lower 12 bits = 0
 
-        LUI:
+        LUI,
+        AUIPC:
             immediate = {instruction_i[31:12], 12'b0};
 
 
@@ -281,6 +283,10 @@ id_ex_reg u_id_ex (
         instruction_i[`OPCODE] == LUI
     ),
 
+    .auipc_i(
+        instruction_i[`OPCODE] == AUIPC
+    ),
+
     .jal_i(
         instruction_i[`OPCODE] == JAL
     ),
@@ -338,6 +344,7 @@ id_ex_reg u_id_ex (
     .alu_o               (alu_w),
     .muldiv_o            (muldiv_w),
     .lui_o               (lui_w),
+    .auipc_o             (auipc_w),
     .jal_o               (jal_w),
     .jalr_o              (jalr_w),
     .branch_o            (branch_w),
@@ -372,6 +379,7 @@ module id_ex_reg (
     input         alu_i,
     input         muldiv_i,
     input         lui_i,
+    input         auipc_i,
     input         jal_i,
     input         jalr_i,
     input         branch_i,
@@ -392,6 +400,7 @@ module id_ex_reg (
     output reg        alu_o,
     output reg        muldiv_o,
     output reg        lui_o,
+    output reg        auipc_o,
     output reg        jal_o,
     output reg        jalr_o,
     output reg        branch_o,
@@ -415,6 +424,7 @@ always @(posedge clk or negedge reset_n) begin
         alu_o               <= 1'b0;
         muldiv_o            <= 1'b0;
         lui_o               <= 1'b0;
+        auipc_o             <= 1'b0;
         jal_o               <= 1'b0;
         jalr_o              <= 1'b0;
         branch_o            <= 1'b0;
@@ -438,6 +448,7 @@ always @(posedge clk or negedge reset_n) begin
         alu_o               <= alu_i;
         muldiv_o            <= muldiv_i;
         lui_o               <= lui_i;
+        auipc_o             <= auipc_i;
         jal_o               <= jal_i;
         jalr_o              <= jalr_i;
         branch_o            <= branch_i;
