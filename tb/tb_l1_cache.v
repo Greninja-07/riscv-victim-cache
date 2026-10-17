@@ -18,6 +18,8 @@
 
 module tb_l1_cache;
 
+    parameter MEM_BYTES = 16384;
+
     localparam DATA_WIDTH  = 32;
     localparam ADDR_WIDTH  = 32;
     localparam BLOCK_WORDS = 4;
@@ -99,7 +101,7 @@ module tb_l1_cache;
     main_memory #(
         .ADDR_WIDTH (ADDR_WIDTH),
         .DATA_WIDTH (LINE_WIDTH),
-        .MEM_DEPTH  (256),
+        .MEM_BYTES  (MEM_BYTES),
         .LATENCY    (MEM_LATENCY)
     ) mem_inst (
         .clk        (clk),
