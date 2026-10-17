@@ -41,9 +41,11 @@ test_cpu: $(RTL_CORE)/pipeline.v $(RTL_CORE)/IF_ID.v $(RTL_CORE)/execute.v $(RTL
 	$(IVERILOG) -g2005 -Ptb.FAST=0 -I $(RTL_CORE) -o $(SIM_CPU) $(TB_DIR)/tb.v $(RTL_CORE)/pipeline.v $(RTL_CORE)/IF_ID.v $(RTL_CORE)/execute.v $(RTL_CORE)/muldiv.v $(RTL_CORE)/wb.v $(RTL_MEM)/memory.v
 	$(PYTHON) $(SCRIPTS)/sys_test.py $(SIM_CPU) 100
 	$(PYTHON) $(SCRIPTS)/directed_cf_test.py $(SIM_CPU)
+	$(PYTHON) $(SCRIPTS)/directed_auipc_test.py $(SIM_CPU)
 	$(IVERILOG) -g2005 -Ptb.FAST=1 -I $(RTL_CORE) -o $(SIM_CPU) $(TB_DIR)/tb.v $(RTL_CORE)/pipeline.v $(RTL_CORE)/IF_ID.v $(RTL_CORE)/execute.v $(RTL_CORE)/muldiv.v $(RTL_CORE)/wb.v $(RTL_MEM)/memory.v
 	$(PYTHON) $(SCRIPTS)/sys_test.py $(SIM_CPU) 100
 	$(PYTHON) $(SCRIPTS)/directed_cf_test.py $(SIM_CPU)
+	$(PYTHON) $(SCRIPTS)/directed_auipc_test.py $(SIM_CPU)
 
 # Target: test_all - Run all simulation suites
 test_all: sim_l1 sim_md sim_cpu test_cpu

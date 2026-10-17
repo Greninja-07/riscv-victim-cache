@@ -20,6 +20,7 @@ module execute
     input         jal,
     input         jalr,
     input         lui,
+    input         auipc,
     input         alu,
     input         muldiv,        // RV32M instruction in EX
     input         branch,
@@ -194,6 +195,7 @@ always @(*) begin
         jal,
         jalr:      ex_result = pc + 4;
         lui:       ex_result = execute_imm;
+        auipc:     ex_result = pc + execute_imm;
 
         alu: begin
           if (muldiv) ex_result = md_result;     // RV32M
@@ -221,7 +223,7 @@ ex_mem_wb_reg u_ex_mem_wb (
     .stall_n              (!stall_read),  // active-low: hold when stalled
     .ex_result            (ex_result),
     .mem_write            (mem_write && !branch_stall),
-    .alu_to_reg           ((alu | lui | jal | jalr | mem_to_reg) && !md_stall && !branch_stall),  // bubble while MUL/DIV busy; squash wrong-path write
+    .alu_to_reg           ((alu | lui | auipc | jal | jalr | mem_to_reg) && !md_stall && !branch_stall),  // bubble while MUL/DIV busy; squash wrong-path write
     .dest_reg_sel         (dest_reg_sel),
     .branch_taken         (branch_taken),
     .mem_to_reg           (mem_to_reg),

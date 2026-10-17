@@ -53,6 +53,7 @@ module pipe #(
     wire        [31: 0] execute_immediate;
     wire                alu;
     wire                lui;
+    wire                auipc;
     wire                jal;
     wire                jalr;
     wire                branch;
@@ -145,6 +146,7 @@ IF_ID IF_ID_stage (
     .alu_w              (alu),
     .muldiv_w           (muldiv),
     .lui_w              (lui),
+    .auipc_w            (auipc),
     .jal_w              (jal),
     .jalr_w             (jalr),
     .branch_w           (branch),
@@ -251,6 +253,7 @@ execute #(
     .jal              (jal),
     .jalr             (jalr),
     .lui              (lui),
+    .auipc            (auipc),
     .alu              (alu),
     .muldiv           (muldiv),
     .branch           (branch),
