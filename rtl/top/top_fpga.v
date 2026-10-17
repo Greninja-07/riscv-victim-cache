@@ -1,8 +1,8 @@
 `timescale 1ns / 1ps
 
 module top_fpga #(
-    parameter IMEMSIZE = 4096,
-    parameter DMEMSIZE = 4096
+    parameter IMEMSIZE = 16384,
+    parameter DMEMSIZE = 16384
 )(
     input  wire clk,        // fast board clock (e.g. 100 MHz)
     input  wire reset,      // active-high at the pin: BTNC (N17), pressed = reset. Core gets ~reset (active-low).
@@ -88,7 +88,9 @@ pipe pipe_u (
 ////////////////////////////////////////////////////////////
 // INSTRUCTION MEMORY  (matches instr_mem.v)
 ////////////////////////////////////////////////////////////
-instr_mem IMEM (
+instr_mem #(
+    .MEM_BYTES(IMEMSIZE)
+) IMEM (
     .clk(slow_clk), //bugfix: Memory must sync with slow_clk
     .pc(pc_out), //TODO replaced
     .instr(inst_mem_read_data)
@@ -97,7 +99,9 @@ instr_mem IMEM (
 ////////////////////////////////////////////////////////////
 // DATA MEMORY  (matches data_mem.v)
 ////////////////////////////////////////////////////////////
-data_mem DMEM (
+data_mem #(
+    .MEM_BYTES(DMEMSIZE)
+) DMEM (
     .clk(slow_clk), //bugfix: Memory must sync with slow_clk
 
     .re(dmem_read_ready),       // TODO replaced
