@@ -21,8 +21,10 @@
 module main_memory #(
     parameter ADDR_WIDTH = 32,
     parameter DATA_WIDTH = 128,      // 16-byte (4 words) block width
-    parameter MEM_DEPTH  = 256,      // 256 blocks = 4 KB memory
-    parameter LATENCY    = 10        // Default fallback latency
+    parameter MEM_BYTES  = 16384,
+    parameter MEM_DEPTH  = MEM_BYTES / 16, // 16-byte blocks
+    parameter LATENCY    = 10,       // Default fallback latency
+    parameter INIT_FILE  = ""        // Optional hex init file
 )(
     input  wire                  clk,
     input  wire                  rst,
@@ -53,7 +55,7 @@ module main_memory #(
     reg [DATA_WIDTH-1:0] latched_wdata;
     reg latched_we;
 
-    wire [7:0] block_idx = latched_addr[11:4]; // 16-byte block index
+    wire [$clog2(MEM_DEPTH)-1:0] block_idx = latched_addr[$clog2(MEM_BYTES)-1:4]; // 16-byte block index
 
     // Dynamic latency decoding from board switches
     reg [7:0] active_latency;
@@ -67,6 +69,12 @@ module main_memory #(
         endcase
     end
 
+    // =========================================================================
+    // INIT_FILE format:
+    // One 128-bit block per line in hexadecimal:
+    //   {word3, word2, word1, word0} (32 hex characters per line).
+    //   word0 is at the lowest byte address (offset +0), and word3 is at offset +12.
+    // =========================================================================
     integer i;
     reg [31:0] val0, val1, val2, val3;
     initial begin
@@ -79,8 +87,12 @@ module main_memory #(
             storage[i] = {val3, val2, val1, val0};
         end
         // Specific well-known block patterns for unit testing
-        storage[8'h00] = {32'hCAFE0003, 32'hCAFE0002, 32'hCAFE0001, 32'hCAFE0000};
-        storage[8'h01] = {32'hBEEF0003, 32'hBEEF0002, 32'hBEEF0001, 32'hBEEF0000};
+        storage[0] = {32'hCAFE0003, 32'hCAFE0002, 32'hCAFE0001, 32'hCAFE0000};
+        storage[1] = {32'hBEEF0003, 32'hBEEF0002, 32'hBEEF0001, 32'hBEEF0000};
+
+        if (INIT_FILE != "") begin
+            $readmemh(INIT_FILE, storage);
+        end
     end
 
     always @(posedge clk or posedge rst) begin
@@ -105,9 +117,9 @@ module main_memory #(
                             // Fast 1-cycle acknowledgment (N = 1 baseline)
                             mem_ack <= 1'b1;
                             if (mem_we) begin
-                                storage[mem_addr[11:4]] <= mem_wdata;
+                                storage[mem_addr[$clog2(MEM_BYTES)-1:4]] <= mem_wdata;
                             end else begin
-                                mem_rdata <= storage[mem_addr[11:4]];
+                                mem_rdata <= storage[mem_addr[$clog2(MEM_BYTES)-1:4]];
                             end
                         end else begin
                             counter <= active_latency - 1;

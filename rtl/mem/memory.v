@@ -1,24 +1,28 @@
-module instr_mem (
+module instr_mem #(
+	parameter MEM_BYTES = 16384,
+	parameter HEX_FILE  = "imem.hex"
+)(
 	input  wire    	clk,
 	input  wire [31:0] pc, 	// byte address
 	output reg  [31:0] instr
 );
 
-	// 1024 words = 4 KB
-	// Declare instruction memory array (word-addressable, 4 KB total)
+	// Declare instruction memory array (word-addressable)
 	(* ram_style = "block" *)
-	reg [31:0] imem [0:1023];
+	reg [31:0] imem [0:(MEM_BYTES/4)-1];
 
 	// FPGA ROM initialization
 	// Initialize instruction memory from hex file (simulation / FPGA)
 	initial begin
-    	$readmemh("imem.hex", imem);
+		if (HEX_FILE != "") begin
+			$readmemh(HEX_FILE, imem);
+		end
 	end
 
 	// Synchronous instruction fetch
-	// Use word-aligned PC (pc[11:2]) to index memory
+	// Use word-aligned PC to index memory
 	always @(posedge clk) begin
-    	instr <= imem[pc[11:2]];	// word address
+		instr <= imem[pc[$clog2(MEM_BYTES)-1:2]];	// word address
 	end
 
 endmodule
@@ -28,7 +32,10 @@ endmodule
 //====================================
 // Data Memory (DMEM) - FPGA-safe
 //====================================
-module data_mem (
+module data_mem #(
+	parameter MEM_BYTES = 16384,
+	parameter HEX_FILE  = "dmem.hex"
+)(
 	input     	clk,
 
 	// Read port
@@ -43,18 +50,20 @@ module data_mem (
 	input  [3:0]  wstrb
 );
 
-	// Declare data memory array (word-addressable, 4 KB total)
+	// Declare data memory array (word-addressable)
 	// TODO-DMEM-1: Declare dmem
     (* ram_style = "block" *)
-    reg [31:0] dmem [0:1023];
+    reg [31:0] dmem [0:(MEM_BYTES/4)-1];
 	// Decode byte address to word index
-	wire [9:0] rindex = raddr[11:2];
-	wire [9:0] windex = waddr[11:2];
+	wire [$clog2(MEM_BYTES)-3:0] rindex = raddr[$clog2(MEM_BYTES)-1:2];
+	wire [$clog2(MEM_BYTES)-3:0] windex = waddr[$clog2(MEM_BYTES)-1:2];
 
 	// Simulation / FPGA init
-	// TODO-DMEM-2: Initialize data memory from dmem.hex file
+	// TODO-DMEM-2: Initialize data memory from hex file
     initial begin
-        $readmemh("dmem.hex", dmem);
+        if (HEX_FILE != "") begin
+            $readmemh(HEX_FILE, dmem);
+        end
     end
 	// -------------------------
 	// WRITE + READ (SYNC)

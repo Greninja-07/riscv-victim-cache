@@ -292,3 +292,32 @@ gtkwave waveform.vcd
 
 ## Next Week Handoff (Week 2: 12 – 18 Oct)
 * **Integration with Manas:** `rtl/mem/l1_cache_controller.v` will interface with the `dmem_*` signals in `rtl/core/pipeline.v`. `cpu_stall` will connect to Manas's Unified Hazard Detection Unit to stall the RV32I pipeline during cache misses.
+
+---
+
+## Vivado Memory Initialization & Synthesis Guide
+
+When targeting Xilinx FPGAs using Vivado, memory arrays in `instr_mem`, `data_mem`, and `main_memory` initialize via Verilog `$readmemh`.
+
+### 1. Adding `.hex` Files as Design Sources
+
+To ensure Vivado can locate `.hex` files during synthesis:
+* **Vivado GUI**:
+  1. Open the project in Vivado.
+  2. Click **Add Sources** $\to$ **Add or create design sources** $\to$ **Next**.
+  3. Click **Add Files** and select `imem.hex` and `dmem.hex` (or your memory initialization file).
+  4. Ensure the files appear under the **Design Sources** tree.
+* **Vivado Tcl Console / Non-Project Mode**:
+  ```tcl
+  add_files -norecurse {imem.hex dmem.hex}
+  set_property file_type "Memory Initialization Files" [get_files {imem.hex dmem.hex}]
+  ```
+
+### 2. Synthesis Log Verification & Critical Warning
+
+> [!WARNING]
+> During synthesis, Vivado searches for `$readmemh` targets relative to the run working directory (e.g., `<project>.runs/synth_1`). If a `.hex` file is missing or not added to the design sources, Vivado issues a non-fatal warning:
+> ```text
+> WARNING: [Synth 8-2898] ignoring readmemh: file '<filename>.hex' not found
+> ```
+> Vivado will **not** halt with an error; instead, it synthesizes uninitialized BRAMs (holding zeros). Always inspect the synthesis log (`runme.log` or the Vivado Messages window) and search for `readmemh` or `[Synth 8-2898]` to confirm that memory contents were successfully resolved and loaded into BRAM.
