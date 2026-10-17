@@ -430,9 +430,8 @@ always @(posedge clk or negedge reset_n) begin
 
     end
 
-    // When stall_n = 0, update the pipeline register.
-    // When stall_n = 1, hold the old values.
-    else if (!stall_n) begin
+    // stall_n is active-low: 0 = hold (stalled), 1 = update (advance)
+    else if (stall_n) begin
 
         execute_immediate_o <= immediate_i;
         immediate_sel_o     <= immediate_sel_i;
