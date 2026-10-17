@@ -18,7 +18,7 @@
     input                   stall_read_i,
     input                   md_stall_i,      // RV32M: multi-cycle MUL/DIV in EX -> freeze ID/EX register
     input  [31:0]           inst_fetch_pc,
-    input  [31:0]           instruction_i,
+    input  [31:0]           instruction_i,   // unused: kept for port backward compatibility
 
     // WB-stage signals (passed in)
     input                   wb_stall,
@@ -78,7 +78,7 @@ reg         illegal_inst;
 
 assign instruction_o =
         stall_read_i ? NOP :
-        (inst_mem_is_valid ? inst_mem_read_data : instruction_i);
+        (inst_mem_is_valid ? inst_mem_read_data : NOP);
 
 
 ///////////////////////////////////////////////////////////////
