@@ -5,7 +5,7 @@ module top_fpga #(
     parameter DMEMSIZE = 4096
 )(
     input  wire clk,        // fast board clock (e.g. 100 MHz)
-    input  wire reset,      // active-low reset
+    input  wire reset,      // active-high at the pin: BTNC (N17), pressed = reset. Core gets ~reset (active-low).
  
     output [15:0] led
 );
