@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 module tb;
-  parameter FAST = 0;
+  parameter FAST = 1;
   reg clk=0, rst_n=0;
   always #5 clk=~clk;
   wire [31:0] imem_rd, dmem_rd, pc_out;
