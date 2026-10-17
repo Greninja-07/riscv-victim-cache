@@ -32,11 +32,13 @@ def gen_prog(rng, n):
             off=0x100+4*rng.randrange(16); body.append((sw(rs2,0,off),('sw',rs2,off)))
         elif k<0.76:
             off=0x100+4*rng.randrange(16); body.append((lw(rd,0,off),('lw',rd,off)))
-        elif k<0.88:
+        elif k<0.86:
             skip=rng.randrange(0,4); typ=rng.choice([0,1])
             body.append((b(typ,rs1,rs2,4*(skip+1)),('br',typ,rs1,rs2,skip)))
-        else:
+        elif k<0.93:
             body.append((lui(rd,rng.getrandbits(20)),('lui',rd,0)))
+        else:
+            body.append((auipc(rd,rng.getrandbits(20)),('auipc',rd,0)))
     return prog,body
 
 def simulate(prog_words_setup, body):
@@ -51,6 +53,7 @@ def simulate(prog_words_setup, body):
             regs[rd]=(regs[rs1]+imm)&M
     i=0
     while i<len(body):
+        cur_pc=(len(prog_words_setup)+i)*4
         t=body[i][1]; i+=1
         k=t[0]
         if k=='m': _,nm,rd,a,b_=t; v=golden(MNEM[nm],regs[a],regs[b_]); 
@@ -67,6 +70,10 @@ def simulate(prog_words_setup, body):
             if t[1]: regs[t[1]]=mem.get(t[2],0)
         elif k=='lui':
             if t[1]: regs[t[1]]=(0)  # placeholder, replaced below
+        elif k=='auipc':
+            if t[1]:
+                imm = t[2] if len(t)>2 else (body[i-1][0]&0xfffff000)
+                regs[t[1]]=(cur_pc+imm)&M
         elif k=='br':
             _,typ,a,b_,skip=t
             take=(regs[a]==regs[b_]) if typ==0 else (regs[a]!=regs[b_])
@@ -77,10 +84,13 @@ def simulate(prog_words_setup, body):
 def run(seed, fast, nbody=50):
     rng=random.Random(seed)
     setup,body=gen_prog(rng,nbody)
-    # fix lui semantic: need imm; re-derive from encoded word
+    # fix lui/auipc semantic: need imm; re-derive from encoded word
     body2=[]
-    for w,t in body:
+    for idx,(w,t) in enumerate(body):
         if t and t[0]=='lui': t=('lui',t[1],w&0xfffff000)
+        elif t and t[0]=='auipc':
+            pc=(len(setup)+idx)*4
+            t=('auipc',t[1],w&0xfffff000,pc)
         body2.append((w,t))
     body=body2
     # patch simulate for lui
@@ -109,6 +119,9 @@ def run(seed, fast, nbody=50):
             if t[1]: regs[t[1]]=mem.get(t[2],0)
         elif k=='lui':
             if t[1]: regs[t[1]]=t[2]
+        elif k=='auipc':
+            _,rd,imm,pc=t
+            if rd: regs[rd]=(pc+imm)&M
         elif k=='br':
             _,typ,a,b_,skip=t
             take=(regs[a]==regs[b_]) if typ==0 else (regs[a]!=regs[b_])
