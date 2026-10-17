@@ -49,7 +49,7 @@ def run_test(sim_cpu='sim_cpu'):
     ]
 
     write_hex('imem.hex', words)
-    write_hex('dmem.hex', [0] * 1024)
+    write_hex('dmem.hex', [0] * 4096)
 
     expected = {
         0x204: 0x00000000,  # x1: 0 after loop countdown

@@ -153,7 +153,7 @@ def run_test(sim_cpu='sim_cpu'):
     ]
 
     write_hex('imem.hex', words)
-    write_hex('dmem.hex', [0] * 1024)
+    write_hex('dmem.hex', [0] * 4096)
 
     # Compute expected results via Python reference model
     expected = simulate_directed_auipc(words)
