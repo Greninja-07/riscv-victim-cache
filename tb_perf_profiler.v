@@ -254,7 +254,7 @@ module tb_perf_profiler;
         victim_hit   = 0;
         prefetch_hit = 0;
         sw           = 3'b000;
-        seed_val     = 32'h1234_5678;
+        seed_val     = 32'hDEAD_BEEF;
 
         $display("================================================================");
         $display("Starting Self-Checking Verification for perf_profiler.v");
