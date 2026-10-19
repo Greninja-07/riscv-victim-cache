@@ -298,8 +298,8 @@ execute #(
     .wb_mem_write     (wb_mem_write),
     .wb_alu_to_reg    (wb_alu_to_reg),
     .wb_dest_reg_sel  (wb_dest_reg_sel),
-    .wb_branch        (wb_branch),
-    .wb_branch_nxt    (wb_branch_nxt),
+    .wb_branch        (),
+    .wb_branch_nxt    (),
     .wb_mem_to_reg    (wb_mem_to_reg),
     .wb_read_address  (wb_read_address),
     .mem_alu_operation(wb_alu_operation)
