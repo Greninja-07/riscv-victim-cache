@@ -7,7 +7,7 @@ Soham (C workloads, victim cache), Archit (perf_profiler, top_fpga, prefetcher).
 Repo: github.com/Greninja-07/riscv-victim-cache
 
 ## Scope tiers
-- Commitment: RV32M, configurable-latency memory (N=1/5/10/20), 2 KB direct-mapped
+- Commitment: RV32M, configurable-latency memory (N=1/10/100/200), 2 KB direct-mapped
   L1 D-cache, unified stall, perf counters + 7-seg.
 - Goal: 4-entry victim cache + swap + on/off switch.
 - Stretch: stride prefetcher (8 entries, PC-indexed) + on/off switch, latency sweep.
@@ -60,7 +60,7 @@ Worst path: id_ex src reg -> reg read mux -> 2 DSP48E1 -> carry chain -> muldiv 
 1. Manas: wire L1 into pipeline (combine cpu_stall with md_stall/branch stalls; hit = 0
    stall; keep request stable while stalled). Gate 1: Tue 21 Oct sim; Gate 2: Fri 24 Oct FPGA.
 2. Abhishek: cache-bypass switch, victim-fill/swap port + prefetch port (freeze by 21 Oct),
-   run workloads at N=1/5/10/20 cache on/off.
+   run workloads at N=1/10/100/200 cache on/off.
 3. Soham: sw/ toolchain (-march=rv32im -mabi=ilp32 -mcmodel=medlow -fno-pic -mno-relax
    -nostdlib, custom crt0, linker for 16 KB, elf->hex), 5 workloads, victim_cache.v + tb.
 4. Archit: perf_profiler.v (6x32-bit counters: cycles, stall cycles, L1 access, L1 miss,

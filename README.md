@@ -205,10 +205,10 @@ module l1_cache_controller #(
 #### `rtl/mem/main_memory.v`
 Configurable latency memory model simulating DRAM / off-chip latency:
 * **Board Switch Selectable Latency (`latency_sel [1:0]`):**
-  * `2'b00` : **$N = 1$ cycle** (Baseline reference: reproduces zero-cache-benefit baseline)
-  * `2'b01` : **$N = 5$ cycles** (Moderate latency)
-  * `2'b10` : **$N = 10$ cycles** (Default off-chip latency)
-  * `2'b11` : **$N = 20$ cycles** (High penalty latency)
+  * `2'b00` : **$N = 1$ cycle**   (Baseline: cache brings negligible benefit)
+  * `2'b01` : **$N = 10$ cycles**  (L2-like latency, moderate miss penalty)
+  * `2'b10` : **$N = 100$ cycles** (Realistic DRAM latency, significant cache benefit)
+  * `2'b11` : **$N = 200$ cycles** (Worst-case stall, maximum prefetch/victim benefit)
 * 128-bit wide block transfers (matching L1 cache line).
 * Edge-safe Request/Acknowledge handshake.
 
@@ -218,13 +218,13 @@ Configurable latency memory model simulating DRAM / off-chip latency:
 
 The self-checking testbench (`tb/tb_l1_cache.v`) rigorously tests all cache operations against `rtl/mem/main_memory.v`:
 
-1. **Test 1: Cold Read Miss:** Verifies miss detection, asserts `mem_req`, stalls CPU for memory latency ($N=10$), refills 128-bit block, and releases CPU stall.
+1. **Test 1: Cold Read Miss:** Verifies miss detection, asserts `mem_req`, stalls CPU for memory latency ($N=10$, `latency_sel=2'b01`), refills 128-bit block, and releases CPU stall.
 2. **Test 2: Spatial Locality Hits:** Verifies consecutive reads to Words 1, 2, and 3 in the same 16-byte block complete with **0 stall cycles**.
 3. **Test 3: Write Hit & Byte Masking:** Verifies full word store (`SW`) and individual byte store (`SB`) with byte mask merging and dirty bit tracking.
 4. **Test 4: Write Miss (Store Allocate):** Verifies miss allocation, merging write data into fetched line, and setting dirty flag.
 5. **Test 5: Conflict Miss & Dirty Eviction Writeback:** Forces tag collision on Index 0, writes dirty block back to main memory, asserts `victim_evict_valid`, and allocates new line.
 6. **Test 6: Memory Persistence Reload:** Reloads previously evicted block from main memory and verifies all earlier byte and word modifications remained persistent.
-7. **Test 7: Configurable Latency Switches (TA Requirement):** Dynamically toggles `latency_sel` across $N = 1, 5, 20$ cycles to verify penalty scaling and baseline reference.
+7. **Test 7: Configurable Latency Switches (TA Requirement):** Dynamically toggles `latency_sel` across $N = 1, 10, 200$ cycles to verify penalty scaling and baseline reference.
 
 #### Simulation Command:
 ```bash
@@ -275,10 +275,10 @@ gtkwave waveform.vcd
 --- TEST 7: Configurable Latency Switches (TA Requirement) ---
 [SWITCH] latency_sel = 2'b00 (N = 1 cycle baseline)
 [PASS] Read Addr: 0x00000020 | Data: 0x44440020 | Stall Cycles: 3
-[SWITCH] latency_sel = 2'b01 (N = 5 cycles)
-[PASS] Read Addr: 0x00000030 | Data: 0x44440030 | Stall Cycles: 7
-[SWITCH] latency_sel = 2'b11 (N = 20 cycles)
-[PASS] Read Addr: 0x00000040 | Data: 0x44440040 | Stall Cycles: 22
+[SWITCH] latency_sel = 2'b01 (N = 10 cycles)
+[PASS] Read Addr: 0x00000030 | Data: 0x44440030 | Stall Cycles: 12
+[SWITCH] latency_sel = 2'b11 (N = 200 cycles)
+[PASS] Read Addr: 0x00000040 | Data: 0x44440040 | Stall Cycles: 202
 
 ==================================================================
   TESTBENCH COMPLETED

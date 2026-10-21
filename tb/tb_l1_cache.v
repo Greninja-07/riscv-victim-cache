@@ -204,7 +204,7 @@ module tb_l1_cache;
         cpu_addr  = 0;
         cpu_wdata = 0;
         cpu_wmask   = 0;
-        latency_sel = 2'b10; // Default N = 10 cycles
+        latency_sel = 2'b01; // Default N = 10 cycles (2'b01 in new scheme)
 
         #20 rst = 0;
         @(posedge clk);
@@ -268,11 +268,11 @@ module tb_l1_cache;
         cpu_read(32'h0000_0004, 32'hCAFE_9901); // Must retain byte modification
 
         // --------------------------------------------------------------------
-        // Test 7: Board Switch Selectable Latency (N = 1, 5, 20 cycles)
+        // Test 7: Board Switch Selectable Latency (N = 1, 10, 200 cycles)
         // Demonstrating TA Specification:
-        //   - N = 1  reproduces baseline case (minimal stall)
-        //   - N = 5  models moderate memory latency
-        //   - N = 20 models high off-chip latency
+        //   - N = 1   reproduces baseline case (minimal stall)
+        //   - N = 10  models L2-like memory latency
+        //   - N = 200 models worst-case DRAM latency
         // --------------------------------------------------------------------
         $display("\n--- TEST 7: Configurable Latency Switches (TA Requirement) ---");
         
@@ -281,14 +281,14 @@ module tb_l1_cache;
         $display("[SWITCH] latency_sel = 2'b00 (N = 1 cycle baseline)");
         cpu_read(32'h0000_0020, 32'h44440020);
 
-        // Mode 2: N = 5 (2'b01)
+        // Mode 2: N = 10 (2'b01)
         latency_sel = 2'b01;
-        $display("[SWITCH] latency_sel = 2'b01 (N = 5 cycles)");
+        $display("[SWITCH] latency_sel = 2'b01 (N = 10 cycles)");
         cpu_read(32'h0000_0030, 32'h44440030);
 
-        // Mode 3: N = 20 (2'b11)
+        // Mode 3: N = 200 (2'b11)
         latency_sel = 2'b11;
-        $display("[SWITCH] latency_sel = 2'b11 (N = 20 cycles)");
+        $display("[SWITCH] latency_sel = 2'b11 (N = 200 cycles)");
         cpu_read(32'h0000_0040, 32'h44440040);
 
         // --------------------------------------------------------------------

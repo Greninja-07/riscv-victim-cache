@@ -10,10 +10,10 @@
 //   - Physical storage remains synthesizable BRAM.
 //   - Wrapped in an FSM that delays response by N cycles to model off-chip DRAM.
 //   - N is runtime-selectable via board switches (SW[1:0]):
-//       2'b00 : N = 1  cycle  (Baseline reference: zero cache benefit)
-//       2'b01 : N = 5  cycles (Moderate latency)
-//       2'b10 : N = 10 cycles (Default off-chip latency)
-//       2'b11 : N = 20 cycles (High penalty latency)
+//       2'b00 : N = 1   cycle  (Baseline: cache brings negligible benefit)
+//       2'b01 : N = 10  cycles (L2-like latency, moderate miss penalty)
+//       2'b10 : N = 100 cycles (Realistic DRAM latency, significant cache benefit)
+//       2'b11 : N = 200 cycles (Worst-case stall, max prefetch/victim benefit)
 //   - 16-byte (128-bit) block transfers matching L1 cache lines.
 //   - Robust request/acknowledge handshake protocol.
 // ============================================================================
@@ -61,10 +61,10 @@ module main_memory #(
     reg [7:0] active_latency;
     always @(*) begin
         case (latency_sel)
-            2'b00: active_latency = 8'd1;   // 1 cycle (baseline comparison)
-            2'b01: active_latency = 8'd5;   // 5 cycles
-            2'b10: active_latency = 8'd10;  // 10 cycles (default)
-            2'b11: active_latency = 8'd20;  // 20 cycles
+            2'b00: active_latency = 8'd1;   // 1 cycle   (baseline, zero cache benefit)
+            2'b01: active_latency = 8'd10;  // 10 cycles  (L2-like, moderate miss penalty)
+            2'b10: active_latency = 8'd100; // 100 cycles (realistic DRAM latency)
+            2'b11: active_latency = 8'd200; // 200 cycles (worst-case stall)
             default: active_latency = LATENCY;
         endcase
     end
