@@ -363,8 +363,8 @@ module tb_l1_cache;
         // --------------------------------------------------------------------
         $display("\n--- TEST 10: Hardware Performance Profiler Signals ---");
         $display("[INFO] Total Accesses: %0d | Hits: %0d | Misses: %0d", cnt_access, cnt_hit, cnt_miss);
-        if ((cnt_access === (cnt_hit + cnt_miss)) && (cnt_hit > 0) && (cnt_miss == 9)) begin
-            $display("[PASS] Profiler Counters Exact Match (Accesses == Hits + Misses, 9 Misses)");
+        if ((cnt_access === (cnt_hit + cnt_miss)) && (cnt_hit > 0) && (cnt_miss == 10)) begin
+            $display("[PASS] Profiler Counters Exact Match (Accesses == Hits + Misses, 10 Misses)");
             pass_count = pass_count + 1;
         end else begin
             $display("[FAIL] Profiler Counter Mismatch!");
