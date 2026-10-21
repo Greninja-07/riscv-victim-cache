@@ -218,10 +218,11 @@ module l1_cache_controller #(
                 latched_we    <= cpu_we;
 
                 // If existing line is dirty, capture eviction info for victim cache
-                if (valid_bits[req_index] && dirty_bits[req_index]) begin
-                    victim_evict_valid <= 1'b1;
-                    victim_evict_addr  <= {tag_array[req_index], req_index, {BLOCK_BITS{1'b0}}};
-                    victim_evict_data  <= data_array[req_index];
+                // Pulse victim_evict_valid for 1 cycle on ANY valid line eviction (clean or dirty)
+                if (state == IDLE && cpu_req && !cache_hit && valid_bits[req_index]) begin
+                        victim_evict_valid <= 1'b1;
+                        victim_evict_addr  <= {tag_array[req_index], req_index, {BLOCK_BITS{1'b0}}};
+                        victim_evict_data  <= data_array[req_index];
                 end else begin
                     victim_evict_valid <= 1'b0;
                 end
