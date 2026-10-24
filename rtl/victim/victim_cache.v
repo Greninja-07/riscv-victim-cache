@@ -90,3 +90,51 @@ module victim_cache #(
             end
         end
     end
+
+    // Target slot for normal eviction: overwrite existing match if present, else LRU slot
+    wire [1:0] evict_target_idx = dup_match ? dup_idx : lru_idx;
+    wire [1:0] evict_old_age    = lru_age[evict_target_idx];
+    wire [1:0] swap_old_age     = lru_age[hit_idx];
+
+    // ------------------------------------------------------------------------
+    // Sequential Update Logic (Eviction Push, Block Swap, and True LRU Aging)
+    // ------------------------------------------------------------------------
+    integer k;
+    always @(posedge clk or posedge rst) begin
+        if (rst) begin
+            for (k = 0; k < NUM_ENTRIES; k = k + 1) begin
+                valid_bits[k] <= 1'b0;
+                tag_array[k]  <= {FULL_TAG_BITS{1'b0}};
+                data_array[k] <= {LINE_WIDTH{1'b0}};
+                lru_age[k]    <= k[1:0]; // Strict initial permutation: 0, 1, 2, 3
+            end
+        end else if (swap_valid && vc_hit) begin
+            // Atomic Block Swap: Replace hitting VC entry with displaced L1 block
+            valid_bits[hit_idx] <= 1'b1;
+            tag_array[hit_idx]  <= evict_tag;
+            data_array[hit_idx] <= evict_data;
+
+            // Update True LRU ages: hit_idx becomes MRU (0)
+            for (k = 0; k < NUM_ENTRIES; k = k + 1) begin
+                if (k[1:0] == hit_idx)
+                    lru_age[k] <= 2'd0;
+                else if (lru_age[k] < swap_old_age)
+                    lru_age[k] <= lru_age[k] + 2'd1;
+            end
+        end else if (evict_valid) begin
+            // Normal L1 Eviction: Insert displaced L1 block into LRU entry
+            valid_bits[evict_target_idx] <= 1'b1;
+            tag_array[evict_target_idx]  <= evict_tag;
+            data_array[evict_target_idx] <= evict_data;
+
+            // Update True LRU ages: evict_target_idx becomes MRU (0)
+            for (k = 0; k < NUM_ENTRIES; k = k + 1) begin
+                if (k[1:0] == evict_target_idx)
+                    lru_age[k] <= 2'd0;
+                else if (lru_age[k] < evict_old_age)
+                    lru_age[k] <= lru_age[k] + 2'd1;
+            end
+        end
+    end
+
+endmodule
