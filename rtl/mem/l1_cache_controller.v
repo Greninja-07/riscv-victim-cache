@@ -3,7 +3,6 @@
 // ============================================================================
 // Module: l1_cache_controller
 // Project: RV32I Memory Hierarchy Enhancement with Victim Cache & Prefetcher
-// Author: Abhishek Kumar (Group 14)
 //
 // Description:
 //   2 KB Direct-Mapped L1 Data Cache Controller.
