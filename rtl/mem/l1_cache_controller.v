@@ -41,22 +41,17 @@ module l1_cache_controller #(
     output wire                   l1_access,
     output wire                   l1_hit,
     output wire                   l1_miss,
+    output wire                   vc_hit_o,
 
-    // ------------------------------------------------------------------------
-    // Main Memory / Interconnect Interface (128-bit Block Transfers)
-    // ------------------------------------------------------------------------
-    output reg                    mem_req,
-    output reg                    mem_we,
-    output reg  [ADDR_WIDTH-1:0]  mem_addr,
-    output reg  [BLOCK_WORDS*DATA_WIDTH-1:0] mem_wdata,
-    input  wire [BLOCK_WORDS*DATA_WIDTH-1:0] mem_rdata,
-    input  wire                   mem_ack,
+    // ... mem interface ...
 
-    // ------------------------------------------------------------------------
-    // Victim Cache Eviction Bus (Interface for Soham's Victim Cache in Week 4)
-    // ------------------------------------------------------------------------
-    output reg                    victim_evict_valid,
-    output reg  [ADDR_WIDTH-1:0]  victim_evict_addr,
+    // Victim Cache Bidirectional Interface (Lookup, Eviction Push & Block Swap)
+    output wire [ADDR_WIDTH-1:0]             victim_lookup_addr,
+    input  wire                              victim_hit,
+    input  wire [BLOCK_WORDS*DATA_WIDTH-1:0] victim_hit_data,
+    output reg                               victim_evict_valid,
+    output reg                               victim_swap_valid,
+    output reg  [ADDR_WIDTH-1:0]             victim_evict_addr,
     output reg  [BLOCK_WORDS*DATA_WIDTH-1:0] victim_evict_data
 );
 
