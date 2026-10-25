@@ -17,9 +17,10 @@ SCRIPTS    = scripts
 
 # Simulation binaries and artifacts
 SIM_L1   = sim_l1
+SIM_MEM  = sim_mem
 SIM_CPU  = sim_cpu
 
-.PHONY: all test_all sim_l1 sim_md sim_cpu test_cpu clean
+.PHONY: all test_all sim_l1 sim_mem sim_md sim_cpu test_cpu clean
 
 all: test_all
 
@@ -27,6 +28,11 @@ all: test_all
 sim_l1: $(RTL_MEM)/l1_cache_controller.v $(RTL_MEM)/main_memory.v $(RTL_VICTIM)/victim_cache.v $(TB_DIR)/tb_l1_cache.v
 	$(IVERILOG) -g2005 -o $(SIM_L1) $(RTL_MEM)/l1_cache_controller.v $(RTL_MEM)/main_memory.v $(RTL_VICTIM)/victim_cache.v $(TB_DIR)/tb_l1_cache.v
 	$(VVP) $(SIM_L1)
+
+# Target: sim_mem - Compile and run Unified Memory Subsystem unit testbench
+sim_mem: $(RTL_MEM)/mem_subsystem.v $(RTL_MEM)/l1_cache_controller.v $(RTL_MEM)/main_memory.v $(RTL_VICTIM)/victim_cache.v $(TB_DIR)/tb_mem_subsystem.v
+	$(IVERILOG) -g2005 -o $(SIM_MEM) $(RTL_MEM)/mem_subsystem.v $(RTL_MEM)/l1_cache_controller.v $(RTL_MEM)/main_memory.v $(RTL_VICTIM)/victim_cache.v $(TB_DIR)/tb_mem_subsystem.v
+	$(VVP) $(SIM_MEM)
 
 # Target: sim_md - Run RV32M hardware multiplier/divider unit tests
 sim_md:
@@ -50,10 +56,10 @@ test_cpu: $(RTL_CORE)/pipeline.v $(RTL_CORE)/IF_ID.v $(RTL_CORE)/execute.v $(RTL
 	$(PYTHON) $(SCRIPTS)/directed_auipc_test.py $(SIM_CPU)
 
 # Target: test_all - Run all simulation suites
-test_all: sim_l1 sim_md sim_cpu test_cpu
+test_all: sim_l1 sim_mem sim_md sim_cpu test_cpu
 
 # Target: clean - Remove simulation executables, dumps, and temporary files
 clean:
-	rm -f $(SIM_L1) $(SIM_CPU) md0 md1
+	rm -f $(SIM_L1) $(SIM_MEM) $(SIM_CPU) md0 md1
 	rm -f waveform.vcd md_vec.txt imem.hex dmem.hex
 	rm -rf __pycache__ $(SCRIPTS)/__pycache__
