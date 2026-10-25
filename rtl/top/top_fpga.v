@@ -23,8 +23,10 @@
 // ============================================================================
 
 module top_fpga #(
-    parameter IMEMSIZE = 16384,
-    parameter DMEMSIZE = 16384
+    parameter IMEMSIZE   = 16384,
+    parameter DMEMSIZE   = 16384,
+    parameter IMEM_HEX   = "imem.hex",
+    parameter MEM128_HEX = "mem128.hex"
 )(
     input  wire        clk,          // 100 MHz oscillator (pin E3)
     input  wire        reset,        // Active-high push button BTNC (pin N17)
@@ -167,7 +169,7 @@ module top_fpga #(
     // ------------------------------------------------------------------------
     instr_mem #(
         .MEM_BYTES(IMEMSIZE),
-        .HEX_FILE ("imem.hex")
+        .HEX_FILE (IMEM_HEX)
     ) IMEM (
         .clk  (cpu_clk),
         .pc   (pc_out),
@@ -181,7 +183,7 @@ module top_fpga #(
         .ADDR_WIDTH (32),
         .DATA_WIDTH (32),
         .MEM_BYTES  (DMEMSIZE),
-        .INIT_FILE  ("dmem.hex"),
+        .INIT_FILE  (MEM128_HEX),
         .LATENCY    (10)
     ) mem_subsystem_inst (
         .clk                 (cpu_clk),
