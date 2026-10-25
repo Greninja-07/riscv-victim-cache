@@ -67,6 +67,7 @@ module l1_cache_controller #(
     localparam WB_WAIT    = 3'b010;
     localparam ALLOCATE   = 3'b011;
     localparam RESP       = 3'b100;
+    localparam VC_SWAP    = 3'b101;
 
     reg [2:0] state, next_state;
 
@@ -90,6 +91,13 @@ module l1_cache_controller #(
     wire [TAG_BITS-1:0]   latched_tag      = latched_addr[ADDR_WIDTH-1 : ADDR_WIDTH-TAG_BITS];
     wire [INDEX_BITS-1:0] latched_index    = latched_addr[ADDR_WIDTH-TAG_BITS-1 : BLOCK_BITS];
     wire [1:0]            latched_word_sel = latched_addr[3:2];
+
+    // Address sent to Victim Cache for parallel tag lookup
+    assign victim_lookup_addr = (state == IDLE)
+                              ? {req_tag, req_index, {BLOCK_BITS{1'b0}}}
+                              : {latched_tag, latched_index, {BLOCK_BITS{1'b0}}};
+
+    assign vc_hit_o = (state == IDLE) && cpu_req && !cache_hit && victim_hit;
 
     // ------------------------------------------------------------------------
     // Storage Arrays (Synthesizable FPGA BRAM inference for Data Array)
