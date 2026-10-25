@@ -5,13 +5,11 @@
 // Project: RV32I Memory Hierarchy Enhancement with Victim Cache & Prefetcher
 //
 // Description:
-//   2 KB Direct-Mapped L1 Data Cache Controller.
+//   2 KB Direct-Mapped L1 Data Cache Controller with Victim Cache Swap Support.
 //   - 128 cache lines, 16-byte block size (4 x 32-bit words).
 //   - Byte-level write strobes for SB, SH, SW support.
 //   - Write-back policy with dirty bit tracking.
-//   - Block-level memory interface (128-bit lines) with eviction signaling.
-//   - Zero-stall hit path for optimal pipeline throughput.
-//   - Synthesizable FPGA Block RAM (BRAM) inference style.
+//   - Hardware block-swapping FSM state (VC_SWAP) for 2-cycle Victim Cache hits.
 // ============================================================================
 
 module l1_cache_controller #(
@@ -43,9 +41,19 @@ module l1_cache_controller #(
     output wire                   l1_miss,
     output wire                   vc_hit_o,
 
-    // ... mem interface ...
+    // ------------------------------------------------------------------------
+    // Main Memory / Interconnect Interface (128-bit Block Transfers)
+    // ------------------------------------------------------------------------
+    output reg                    mem_req,
+    output reg                    mem_we,
+    output reg  [ADDR_WIDTH-1:0]  mem_addr,
+    output reg  [BLOCK_WORDS*DATA_WIDTH-1:0] mem_wdata,
+    input  wire [BLOCK_WORDS*DATA_WIDTH-1:0] mem_rdata,
+    input  wire                   mem_ack,
 
+    // ------------------------------------------------------------------------
     // Victim Cache Bidirectional Interface (Lookup, Eviction Push & Block Swap)
+    // ------------------------------------------------------------------------
     output wire [ADDR_WIDTH-1:0]             victim_lookup_addr,
     input  wire                              victim_hit,
     input  wire [BLOCK_WORDS*DATA_WIDTH-1:0] victim_hit_data,
@@ -56,7 +64,7 @@ module l1_cache_controller #(
 );
 
     localparam LINE_WIDTH = BLOCK_WORDS * DATA_WIDTH; // 128 bits
-    localparam TAG_BITS   = ADDR_WIDTH - INDEX_BITS - BLOCK_BITS; // 32 - 7 - 4 = 21 bits
+    localparam TAG_BITS   = ADDR_WIDTH - INDEX_BITS - BLOCK_BITS; // 21 bits
     localparam NUM_LINES  = 1 << INDEX_BITS; // 128 lines
 
     // ------------------------------------------------------------------------
@@ -74,10 +82,6 @@ module l1_cache_controller #(
     // ------------------------------------------------------------------------
     // Address Field Decomposition
     // ------------------------------------------------------------------------
-    // [31:11] = Tag (21 bits)
-    // [10:4]  = Index (7 bits)
-    // [3:2]   = Word Offset (2 bits)
-    // [1:0]   = Byte Offset (2 bits)
     wire [TAG_BITS-1:0]   req_tag      = cpu_addr[ADDR_WIDTH-1 : ADDR_WIDTH-TAG_BITS];
     wire [INDEX_BITS-1:0] req_index    = cpu_addr[ADDR_WIDTH-TAG_BITS-1 : BLOCK_BITS];
     wire [1:0]            req_word_sel = cpu_addr[3:2];
@@ -98,10 +102,8 @@ module l1_cache_controller #(
                               ? {req_tag, req_index, {BLOCK_BITS{1'b0}}}
                               : {latched_tag, latched_index, {BLOCK_BITS{1'b0}}};
 
-    assign vc_hit_o = (state == IDLE) && cpu_req && !cache_hit && victim_hit;
-
     // ------------------------------------------------------------------------
-    // Storage Arrays (Synthesizable FPGA BRAM inference for Data Array)
+    // Storage Arrays
     // ------------------------------------------------------------------------
     (* ram_style = "block" *)
     reg [LINE_WIDTH-1:0] data_array [0:NUM_LINES-1];
@@ -130,7 +132,7 @@ module l1_cache_controller #(
         endcase
     end
 
-    // Latched word extraction for refill response
+    // Latched word extraction for refill / swap response
     wire [LINE_WIDTH-1:0] latched_line = data_array[latched_index];
     reg  [DATA_WIDTH-1:0] latched_word;
     always @(*) begin
@@ -142,10 +144,11 @@ module l1_cache_controller #(
         endcase
     end
 
-    // Performance profiling signals
+    // Performance profiling signals (1-cycle pulses in IDLE)
     assign l1_access = (state == IDLE) && cpu_req;
     assign l1_hit    = (state == IDLE) && cpu_req && cache_hit;
     assign l1_miss   = (state == IDLE) && cpu_req && !cache_hit;
+    assign vc_hit_o  = (state == IDLE) && cpu_req && !cache_hit && victim_hit;
 
     // Helper: Build a 128-bit line with byte-level write modifications
     function [LINE_WIDTH-1:0] apply_byte_write(
@@ -202,7 +205,8 @@ module l1_cache_controller #(
             latched_wdata      <= 0;
             latched_wmask      <= 0;
             latched_we         <= 0;
-            victim_evict_valid <= 0;
+            latched_vc_hit     <= 1'b0;
+            victim_evict_valid <= 1'b0;
             victim_evict_addr  <= 0;
             victim_evict_data  <= 0;
             for (j = 0; j < NUM_LINES; j = j + 1) begin
@@ -213,7 +217,6 @@ module l1_cache_controller #(
         end else begin
             state <= next_state;
 
-            // Latch request parameters on cold / conflict miss
             // Default: de-assert 1-cycle eviction push pulse
             victim_evict_valid <= 1'b0;
 
@@ -229,8 +232,8 @@ module l1_cache_controller #(
                 if (valid_bits[req_index]) begin
                     victim_evict_addr <= {tag_array[req_index], req_index, {BLOCK_BITS{1'b0}}};
                     victim_evict_data <= data_array[req_index];
-                    // Only pulse eviction push if Victim Cache missed;
-                    // if it hit, VC_SWAP will perform an atomic swap instead
+                    // If Victim Cache missed, push evicted block into VC LRU slot immediately.
+                    // If Victim Cache hit, VC_SWAP state will atomically swap it instead.
                     if (!victim_hit) begin
                         victim_evict_valid <= 1'b1;
                     end
@@ -239,20 +242,30 @@ module l1_cache_controller #(
 
             // Cache Data & Tag Updates
             if (state == IDLE && cpu_req && cache_hit && cpu_we) begin
-                // Hit Store: Update word with byte mask and mark line dirty
+                // 1. L1 Write Hit
                 data_array[req_index] <= apply_byte_write(data_array[req_index], req_word_sel, cpu_wdata, cpu_wmask);
                 dirty_bits[req_index] <= 1'b1;
-            end else if (state == ALLOCATE && mem_ack) begin
-                // Miss Refill: Install fetched block from memory into cache line
+            end else if (state == VC_SWAP) begin
+                // 2. Victim Cache Hit Refill (1-Cycle Hardware Swap)
                 valid_bits[latched_index] <= 1'b1;
                 tag_array[latched_index]  <= latched_tag;
 
                 if (latched_we) begin
-                    // Store Miss: Merge store data into fetched line and mark dirty
+                    data_array[latched_index] <= apply_byte_write(victim_hit_data, latched_word_sel, latched_wdata, latched_wmask);
+                    dirty_bits[latched_index] <= 1'b1;
+                end else begin
+                    data_array[latched_index] <= victim_hit_data;
+                    dirty_bits[latched_index] <= 1'b0;
+                end
+            end else if (state == ALLOCATE && mem_ack) begin
+                // 3. Main Memory Miss Refill
+                valid_bits[latched_index] <= 1'b1;
+                tag_array[latched_index]  <= latched_tag;
+
+                if (latched_we) begin
                     data_array[latched_index] <= apply_byte_write(mem_rdata, latched_word_sel, latched_wdata, latched_wmask);
                     dirty_bits[latched_index] <= 1'b1;
                 end else begin
-                    // Load Miss: Write pristine memory block and mark clean
                     data_array[latched_index] <= mem_rdata;
                     dirty_bits[latched_index] <= 1'b0;
                 end
@@ -264,26 +277,32 @@ module l1_cache_controller #(
     // FSM Combinational Logic
     // ------------------------------------------------------------------------
     always @(*) begin
-        next_state = state;
-        cpu_stall  = 1'b0;
-        mem_req    = 1'b0;
-        mem_we     = 1'b0;
-        mem_addr   = {ADDR_WIDTH{1'b0}};
-        mem_wdata  = {LINE_WIDTH{1'b0}};
-        cpu_rdata  = selected_word;
+        next_state        = state;
+        cpu_stall         = 1'b0;
+        mem_req           = 1'b0;
+        mem_we            = 1'b0;
+        mem_addr          = {ADDR_WIDTH{1'b0}};
+        mem_wdata         = {LINE_WIDTH{1'b0}};
+        cpu_rdata         = selected_word;
+        victim_swap_valid = 1'b0;
 
         case (state)
             IDLE: begin
                 if (cpu_req) begin
                     if (cache_hit) begin
-                        cpu_stall = 1'b0; // Zero-stall hit
-                        cpu_rdata = selected_word;
+                        cpu_stall  = 1'b0; // Zero-stall L1 hit
+                        cpu_rdata  = selected_word;
                         next_state = IDLE;
                     end else begin
-                        cpu_stall = 1'b1; // Miss penalty begins
+                        cpu_stall = 1'b1;  // L1 miss penalty begins
                         if (valid_bits[req_index] && dirty_bits[req_index]) begin
+                            // Write back dirty L1 line first so VC always stays clean/coherent
                             next_state = WRITE_BACK;
+                        end else if (victim_hit) begin
+                            // Fast 1-cycle swap with Victim Cache (skips Main Memory!)
+                            next_state = VC_SWAP;
                         end else begin
+                            // Fetch from Main Memory
                             next_state = ALLOCATE;
                         end
                     end
@@ -306,7 +325,17 @@ module l1_cache_controller #(
                 cpu_stall = 1'b1;
                 mem_req   = 1'b0;
                 mem_we    = 1'b0;
-                next_state = ALLOCATE;
+                // If Victim Cache hit, swap directly from VC instead of reading Main Memory
+                if (latched_vc_hit)
+                    next_state = VC_SWAP;
+                else
+                    next_state = ALLOCATE;
+            end
+
+            VC_SWAP: begin
+                cpu_stall         = 1'b1;
+                victim_swap_valid = 1'b1;
+                next_state        = RESP;
             end
 
             ALLOCATE: begin
@@ -321,9 +350,8 @@ module l1_cache_controller #(
             end
 
             RESP: begin
-                // Hold stall low for 1 cycle to let CPU latch rdata/complete cycle
-                cpu_stall = 1'b0;
-                cpu_rdata = latched_word;
+                cpu_stall  = 1'b0;
+                cpu_rdata  = latched_word;
                 next_state = IDLE;
             end
 
