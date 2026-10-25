@@ -71,7 +71,6 @@ module tb_l1_cache;
     ) dut (
         .clk               (clk),
         .rst               (rst),
-        .vc_en             (vc_en),
         .cpu_req           (cpu_req),
         .cpu_we            (cpu_we),
         .cpu_addr          (cpu_addr),
@@ -110,6 +109,7 @@ module tb_l1_cache;
     ) vc_inst (
         .clk        (clk),
         .rst        (rst),
+        .vc_en      (vc_en),
         .lookup_addr(victim_lookup_addr),
         .vc_hit     (victim_hit),
         .vc_hit_data(victim_hit_data),
