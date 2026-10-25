@@ -17,6 +17,7 @@ md1
 *.vvp
 md_vec.txt
 *.hex
+!sw/*.hex
 
 # Python artifacts
 __pycache__/
