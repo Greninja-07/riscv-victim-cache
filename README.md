@@ -31,7 +31,7 @@ riscv-victim-cache/
 ├── scripts/          # Verification tools (asm.py, build_workloads.py, run_benchmarks.py, sys_test.py, pack_hex128.py)
 ├── sw/               # RISC-V workloads (array_sum, vector_dot, conflict_thrash, rw_persistence)
 ├── constraints/      # Nexys A7 FPGA constraints (nexys_a7.xdc)
-├── docs/             # Reports, status updates, Vivado reports (PROJECT_STATE.md, STATUS_REPORT_WEEK3.md)
+├── docs/             # Reports, status updates, Vivado reports (PROJECT_STATE.md, timing & utilization reports)
 ├── Makefile          # Unified build and simulation targets
 └── README.md
 ```
