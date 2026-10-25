@@ -49,11 +49,13 @@ module top_fpga #(
     //             100: Victim Cache Hits
     //             101: Prefetch Hits
     // SW[6]   : Clock mode (0 = 50 MHz fast CPU execution, 1 = 1 Hz human slow clock)
+    // SW[7]   : Victim Cache Enable (0 = Disabled, 1 = Enabled)
     // ------------------------------------------------------------------------
-    wire [1:0] latency_sel  = sw[1:0];
-    wire       cache_bypass = sw[2];
-    wire [2:0] prof_sw      = sw[5:3];
-    wire       slow_clk_sel = sw[6];
+    wire [1:0] latency_sel     = sw[1:0];
+    wire       cache_bypass    = sw[2];
+    wire [2:0] prof_sw         = sw[5:3];
+    wire       slow_clk_sel    = sw[6];
+    wire       victim_cache_en = sw[7];
 
     // ------------------------------------------------------------------------
     // Clock Generation
@@ -186,7 +188,7 @@ module top_fpga #(
         .rst                 (sys_rst),
         .latency_sel         (latency_sel),
         .cache_bypass        (cache_bypass),
-        .victim_cache_en     (sw[6]),
+        .victim_cache_en     (victim_cache_en),
         .dmem_read_ready     (dmem_read_ready),
         .dmem_read_address   (dmem_read_address),
         .dmem_write_ready    (dmem_write_ready),
@@ -237,14 +239,18 @@ module top_fpga #(
     // ------------------------------------------------------------------------
     // led[15]    : Program done / frozen flag
     // led[14]    : Memory stall indicator
-    // led[13:6]  : Program Counter bits [9:2]
+    // led[13:8]  : Program Counter bits [7:2]
+    // led[7]     : Victim Cache Enable indicator (sw[7])
+    // led[6]     : Clock mode indicator (sw[6])
     // led[5:3]   : Active 7-segment counter selector (prof_sw)
     // led[2]     : Cache Bypass indicator (sw[2])
     // led[1:0]   : Latency setting (sw[1:0])
     // ------------------------------------------------------------------------
     assign led[15]   = frozen;
     assign led[14]   = mem_stall;
-    assign led[13:6] = pc_out[9:2];
+    assign led[13:8] = pc_out[7:2];
+    assign led[7]    = victim_cache_en;
+    assign led[6]    = slow_clk_sel;
     assign led[5:3]  = prof_sw;
     assign led[2]    = cache_bypass;
     assign led[1:0]  = latency_sel;
