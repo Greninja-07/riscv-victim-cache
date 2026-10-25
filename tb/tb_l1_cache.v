@@ -17,6 +17,7 @@ module tb_l1_cache;
 
     reg clk;
     reg rst;
+    reg vc_en;
 
     // CPU Interface
     reg                   cpu_req;
@@ -70,6 +71,7 @@ module tb_l1_cache;
     ) dut (
         .clk               (clk),
         .rst               (rst),
+        .vc_en             (vc_en),
         .cpu_req           (cpu_req),
         .cpu_we            (cpu_we),
         .cpu_addr          (cpu_addr),
@@ -249,6 +251,7 @@ module tb_l1_cache;
 
         clk         = 0;
         rst         = 1;
+        vc_en       = 1;
         cpu_req     = 0;
         cpu_we      = 0;
         cpu_addr    = 0;
