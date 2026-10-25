@@ -3,7 +3,6 @@
 // ============================================================================
 // Testbench: tb_l1_cache (Exhaustive Corner-Case Edition)
 // Project: RV32I Memory Hierarchy Enhancement with Victim Cache & Prefetcher
-// Author: Abhishek Kumar (Group 14)
 // ============================================================================
 
 module tb_l1_cache;
