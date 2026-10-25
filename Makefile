@@ -20,8 +20,9 @@ SIM_L1     = sim_l1
 SIM_MEM    = sim_mem
 SIM_CPU    = sim_cpu
 SIM_SYSTEM = sim_system
+SIM_TOP    = sim_top
 
-.PHONY: all test_all sim_l1 sim_mem sim_md sim_cpu test_cpu sim_system test_benchmarks clean
+.PHONY: all test_all sim_l1 sim_mem sim_md sim_cpu test_cpu sim_system sim_top test_benchmarks clean
 
 all: test_all
 
@@ -61,6 +62,7 @@ sim_system:
 	$(PYTHON) $(SCRIPTS)/build_workloads.py
 	cp sw/array_sum_imem.hex imem.hex
 	cp sw/array_sum_dmem.hex dmem.hex
+	cp sw/array_sum_mem128.hex mem128.hex
 	$(IVERILOG) -g2005 -I $(RTL_CORE) -I $(RTL_MEM) -I $(RTL_PERF) -I $(RTL_VICTIM) -o $(SIM_SYSTEM) \
 		$(TB_DIR)/tb_system.v \
 		$(RTL_CORE)/pipeline.v $(RTL_CORE)/IF_ID.v $(RTL_CORE)/execute.v $(RTL_CORE)/muldiv.v $(RTL_CORE)/wb.v \
@@ -68,16 +70,30 @@ sim_system:
 		$(RTL_VICTIM)/victim_cache.v $(RTL_PERF)/perf_profiler.v
 	$(VVP) $(SIM_SYSTEM) +LATENCY=2 +CACHE_BYPASS=0 +MAXC=50000
 
+# Target: sim_top - Compile and run top-level Nexys A7 FPGA hardware testbench
+sim_top:
+	$(PYTHON) $(SCRIPTS)/build_workloads.py
+	cp sw/array_sum_imem.hex imem.hex
+	cp sw/array_sum_dmem.hex dmem.hex
+	cp sw/array_sum_mem128.hex mem128.hex
+	$(IVERILOG) -g2005 -I $(RTL_CORE) -I $(RTL_MEM) -I $(RTL_PERF) -I $(RTL_VICTIM) -I $(RTL_TOP) -o $(SIM_TOP) \
+		$(TB_DIR)/tb_top_fpga.v \
+		$(RTL_TOP)/top_fpga.v \
+		$(RTL_CORE)/pipeline.v $(RTL_CORE)/IF_ID.v $(RTL_CORE)/execute.v $(RTL_CORE)/muldiv.v $(RTL_CORE)/wb.v \
+		$(RTL_MEM)/memory.v $(RTL_MEM)/mem_subsystem.v $(RTL_MEM)/l1_cache_controller.v $(RTL_MEM)/main_memory.v \
+		$(RTL_VICTIM)/victim_cache.v $(RTL_PERF)/perf_profiler.v
+	$(VVP) $(SIM_TOP)
+
 # Target: test_benchmarks - Run complete benchmark suite across workloads and cache configurations
 test_benchmarks:
 	$(PYTHON) $(SCRIPTS)/build_workloads.py
 	$(PYTHON) $(SCRIPTS)/run_benchmarks.py
 
 # Target: test_all - Run all simulation suites
-test_all: sim_l1 sim_mem sim_md sim_cpu test_cpu test_benchmarks
+test_all: sim_l1 sim_mem sim_md sim_cpu test_cpu sim_system sim_top test_benchmarks
 
 # Target: clean - Remove simulation executables, dumps, and temporary files
 clean:
-	rm -f $(SIM_L1) $(SIM_MEM) $(SIM_CPU) $(SIM_SYSTEM) md0 md1
-	rm -f waveform.vcd md_vec.txt imem.hex dmem.hex
+	rm -f $(SIM_L1) $(SIM_MEM) $(SIM_CPU) $(SIM_SYSTEM) $(SIM_TOP) md0 md1
+	rm -f waveform.vcd md_vec.txt imem.hex dmem.hex mem128.hex
 	rm -rf __pycache__ $(SCRIPTS)/__pycache__
