@@ -27,6 +27,7 @@ module tb_l1_cache;
     reg  [3:0]            cpu_wmask;
     wire [DATA_WIDTH-1:0] cpu_rdata;
     wire                  cpu_stall;
+    reg                   cache_bypass;
 
     // Profiling
     wire l1_access;
@@ -78,6 +79,7 @@ module tb_l1_cache;
         .cpu_wmask         (cpu_wmask),
         .cpu_rdata         (cpu_rdata),
         .cpu_stall         (cpu_stall),
+        .cache_bypass      (cache_bypass),
         .l1_access         (l1_access),
         .l1_hit            (l1_hit),
         .l1_miss           (l1_miss),
@@ -249,10 +251,11 @@ module tb_l1_cache;
         $display("  L1 CACHE + 4-ENTRY VICTIM CACHE VERIFICATION SUITE (Group 14)");
         $display("==================================================================");
 
-        clk         = 0;
-        rst         = 1;
-        vc_en       = 1;
-        cpu_req     = 0;
+        clk          = 0;
+        rst          = 1;
+        vc_en        = 1;
+        cache_bypass = 0;
+        cpu_req      = 0;
         cpu_we      = 0;
         cpu_addr    = 0;
         cpu_wdata   = 0;

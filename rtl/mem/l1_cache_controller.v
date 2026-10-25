@@ -33,6 +33,9 @@ module l1_cache_controller #(
     output reg  [DATA_WIDTH-1:0]  cpu_rdata,
     output reg                    cpu_stall,
 
+    // Hardware Cache-Bypass Switch (TA Requirement / FPGA Switch SW[2])
+    input  wire                   cache_bypass,
+
     // ------------------------------------------------------------------------
     // Performance Profiler Interface (For Archit's Hardware Counters)
     // ------------------------------------------------------------------------
@@ -70,14 +73,17 @@ module l1_cache_controller #(
     // ------------------------------------------------------------------------
     // FSM States
     // ------------------------------------------------------------------------
-    localparam IDLE       = 3'b000;
-    localparam WRITE_BACK = 3'b001;
-    localparam WB_WAIT    = 3'b010;
-    localparam ALLOCATE   = 3'b011;
-    localparam RESP       = 3'b100;
-    localparam VC_SWAP    = 3'b101;
+    localparam IDLE         = 4'd0;
+    localparam WRITE_BACK   = 4'd1;
+    localparam WB_WAIT      = 4'd2;
+    localparam ALLOCATE     = 4'd3;
+    localparam RESP         = 4'd4;
+    localparam VC_SWAP      = 4'd5;
+    localparam BYPASS_READ  = 4'd6;
+    localparam BYPASS_WRITE = 4'd7;
+    localparam BYPASS_WB    = 4'd8;
 
-    reg [2:0] state, next_state;
+    reg [3:0] state, next_state;
 
     // ------------------------------------------------------------------------
     // Address Field Decomposition
@@ -144,11 +150,15 @@ module l1_cache_controller #(
         endcase
     end
 
-    // Performance profiling signals (1-cycle pulses in IDLE)
-    assign l1_access = (state == IDLE) && cpu_req;
-    assign l1_hit    = (state == IDLE) && cpu_req && cache_hit;
-    assign l1_miss   = (state == IDLE) && cpu_req && !cache_hit;
-    assign vc_hit_o  = (state == IDLE) && cpu_req && !cache_hit && victim_hit;
+    // Performance profiling signals (1-cycle pulses in IDLE, suppressed when bypassed)
+    assign l1_access = (state == IDLE) && cpu_req && !cache_bypass;
+    assign l1_hit    = (state == IDLE) && cpu_req && !cache_bypass && cache_hit;
+    assign l1_miss   = (state == IDLE) && cpu_req && !cache_bypass && !cache_hit;
+    assign vc_hit_o  = (state == IDLE) && cpu_req && !cache_bypass && !cache_hit && victim_hit;
+
+    // Registers for cache bypass transactions
+    reg [DATA_WIDTH-1:0]  bypass_rdata;
+    reg [LINE_WIDTH-1:0]  bypass_wline;
 
     // Helper: Build a 128-bit line with byte-level write modifications
     function [LINE_WIDTH-1:0] apply_byte_write(
@@ -220,16 +230,16 @@ module l1_cache_controller #(
             // Default: de-assert 1-cycle eviction push pulse
             victim_evict_valid <= 1'b0;
 
-            // Latch request parameters on L1 miss
-            if (state == IDLE && cpu_req && !cache_hit) begin
+            // Latch request parameters on L1 miss or bypass
+            if (state == IDLE && cpu_req && (cache_bypass || !cache_hit)) begin
                 latched_addr   <= cpu_addr;
                 latched_wdata  <= cpu_wdata;
                 latched_wmask  <= cpu_wmask;
                 latched_we     <= cpu_we;
                 latched_vc_hit <= victim_hit;
 
-                // Capture displaced L1 block for Victim Cache push or swap
-                if (valid_bits[req_index]) begin
+                // Capture displaced L1 block for Victim Cache push or swap (only when not bypassed)
+                if (!cache_bypass && valid_bits[req_index]) begin
                     victim_evict_addr <= {tag_array[req_index], req_index, {BLOCK_BITS{1'b0}}};
                     victim_evict_data <= data_array[req_index];
                     // If Victim Cache missed, push evicted block into VC LRU slot immediately.
@@ -240,8 +250,24 @@ module l1_cache_controller #(
                 end
             end
 
+            // Bypass Read and Write buffering
+            if (state == BYPASS_READ && mem_ack) begin
+                case (latched_word_sel)
+                    2'b00: bypass_rdata <= mem_rdata[31:0];
+                    2'b01: bypass_rdata <= mem_rdata[63:32];
+                    2'b10: bypass_rdata <= mem_rdata[95:64];
+                    2'b11: bypass_rdata <= mem_rdata[127:96];
+                endcase
+            end else if (state == BYPASS_WRITE && mem_ack) begin
+                bypass_wline <= apply_byte_write(mem_rdata, latched_word_sel, latched_wdata, latched_wmask);
+            end else if (state == BYPASS_WB && mem_ack) begin
+                if (valid_bits[latched_index] && (tag_array[latched_index] == latched_tag)) begin
+                    valid_bits[latched_index] <= 1'b0;
+                end
+            end
+
             // Cache Data & Tag Updates
-            if (state == IDLE && cpu_req && cache_hit && cpu_we) begin
+            if (state == IDLE && cpu_req && !cache_bypass && cache_hit && cpu_we) begin
                 // 1. L1 Write Hit
                 data_array[req_index] <= apply_byte_write(data_array[req_index], req_word_sel, cpu_wdata, cpu_wmask);
                 dirty_bits[req_index] <= 1'b1;
@@ -289,21 +315,32 @@ module l1_cache_controller #(
         case (state)
             IDLE: begin
                 if (cpu_req) begin
-                    if (cache_hit) begin
-                        cpu_stall  = 1'b0; // Zero-stall L1 hit
-                        cpu_rdata  = selected_word;
-                        next_state = IDLE;
-                    end else begin
-                        cpu_stall = 1'b1;  // L1 miss penalty begins
+                    if (cache_bypass) begin
+                        cpu_stall = 1'b1; // Stalled for uncached memory access
                         if (valid_bits[req_index] && dirty_bits[req_index]) begin
-                            // Write back dirty L1 line first so VC always stays clean/coherent
                             next_state = WRITE_BACK;
-                        end else if (victim_hit) begin
-                            // Fast 1-cycle swap with Victim Cache (skips Main Memory!)
-                            next_state = VC_SWAP;
+                        end else if (cpu_we) begin
+                            next_state = BYPASS_WRITE;
                         end else begin
-                            // Fetch from Main Memory
-                            next_state = ALLOCATE;
+                            next_state = BYPASS_READ;
+                        end
+                    end else begin
+                        if (cache_hit) begin
+                            cpu_stall  = 1'b0; // Zero-stall L1 hit
+                            cpu_rdata  = selected_word;
+                            next_state = IDLE;
+                        end else begin
+                            cpu_stall = 1'b1;  // L1 miss penalty begins
+                            if (valid_bits[req_index] && dirty_bits[req_index]) begin
+                                // Write back dirty L1 line first so VC always stays clean/coherent
+                                next_state = WRITE_BACK;
+                            end else if (victim_hit) begin
+                                // Fast 1-cycle swap with Victim Cache (skips Main Memory!)
+                                next_state = VC_SWAP;
+                            end else begin
+                                // Fetch from Main Memory
+                                next_state = ALLOCATE;
+                            end
                         end
                     end
                 end
@@ -325,11 +362,13 @@ module l1_cache_controller #(
                 cpu_stall = 1'b1;
                 mem_req   = 1'b0;
                 mem_we    = 1'b0;
-                // If Victim Cache hit, swap directly from VC instead of reading Main Memory
-                if (latched_vc_hit)
+                if (cache_bypass) begin
+                    next_state = latched_we ? BYPASS_WRITE : BYPASS_READ;
+                end else if (latched_vc_hit) begin
                     next_state = VC_SWAP;
-                else
+                end else begin
                     next_state = ALLOCATE;
+                end
             end
 
             VC_SWAP: begin
@@ -349,9 +388,43 @@ module l1_cache_controller #(
                 end
             end
 
+            BYPASS_READ: begin
+                cpu_stall = 1'b1;
+                mem_req   = 1'b1;
+                mem_we    = 1'b0;
+                mem_addr  = {latched_tag, latched_index, {BLOCK_BITS{1'b0}}};
+
+                if (mem_ack) begin
+                    next_state = RESP;
+                end
+            end
+
+            BYPASS_WRITE: begin
+                cpu_stall = 1'b1;
+                mem_req   = 1'b1;
+                mem_we    = 1'b0;
+                mem_addr  = {latched_tag, latched_index, {BLOCK_BITS{1'b0}}};
+
+                if (mem_ack) begin
+                    next_state = BYPASS_WB;
+                end
+            end
+
+            BYPASS_WB: begin
+                cpu_stall = 1'b1;
+                mem_req   = 1'b1;
+                mem_we    = 1'b1;
+                mem_addr  = {latched_tag, latched_index, {BLOCK_BITS{1'b0}}};
+                mem_wdata = bypass_wline;
+
+                if (mem_ack) begin
+                    next_state = RESP;
+                end
+            end
+
             RESP: begin
                 cpu_stall  = 1'b0;
-                cpu_rdata  = latched_word;
+                cpu_rdata  = cache_bypass ? bypass_rdata : latched_word;
                 next_state = IDLE;
             end
 
