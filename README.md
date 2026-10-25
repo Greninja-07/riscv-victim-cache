@@ -40,19 +40,23 @@ riscv-victim-cache/
 
 ## Build & Simulation Commands
 
-All simulations can be run using the top-level `Makefile`:
+All simulations can be run using the top-level `Makefile` or the automated regression runner:
 
 ```bash
-# Run all testbenches and benchmarks
+# Run complete automated master regression suite (5,840 checks, 100% pass)
+python3 scripts/run_automated_regression.py
+
+# Run all testbenches and benchmarks via make
 make test_all
 
-# Run individual testbenches
-make test_benchmarks # Run benchmark suite (array_sum, vector_dot, conflict_thrash, rw_persistence)
+# Run individual simulation targets
+make sim_top         # Digilent Nexys A7-100T FPGA board-level hardware testbench
+make sim_system      # Full integrated CPU + L1 + Victim Cache + Profiler system simulation
+make test_benchmarks # Benchmark suite across 4 workloads & latency scaling sweeps
 make sim_mem         # Unified Memory Subsystem unit testbench (arbitration, latency, bypass)
 make sim_l1          # L1 Data Cache & Victim Cache verification suite (41 tests)
-make sim_system      # Full CPU + L1 + Victim Cache + Profiler system simulation
 make sim_md          # RV32M Hardware Multiplier & Divider tests against golden model
-make sim_cpu         # RV32M Pipelined CPU core execution testbench
+make test_cpu        # RV32M Pipelined CPU core execution testbench (204 tests, FAST=0 & 1)
 
 # Clean simulation artifacts
 make clean
@@ -324,7 +328,7 @@ Implemented by: **Abhishek Kumar**
 Implemented by: **Abhishek Kumar & Group 14**
 
 ### 1. Digilent Nexys A7-100T Top-Level Integration (`rtl/top/top_fpga.v`)
-* **Clocking:** 100 MHz board oscillator (pin `E3`), 50 MHz CPU execution clock, and 1 Hz stepping mode.
+* **Clocking:** 100 MHz board oscillator (pin `E3`), 50 MHz CPU execution clock, and 1 Hz human-readable step mode.
 * **Board Slide Switches (`sw[15:0]`):**
   - `SW[1:0]` : Main Memory Latency ($00 = 1, 01 = 10, 10 = 100, 11 = 200$ cycles).
   - `SW[2]`   : Cache Bypass ($0 = \text{L1 Cache Enabled}, 1 = \text{Bypassed/Uncached}$).
@@ -335,13 +339,22 @@ Implemented by: **Abhishek Kumar & Group 14**
     - `011` : L1 Cache Misses
     - `100` : Victim Cache Hits
     - `101` : Prefetch Hits
-  - `SW[6]`   : Victim Cache Enable ($0 = \text{Disabled}, 1 = \text{Enabled}$).
+  - `SW[6]`   : CPU Clock Mode ($0 = 50\text{ MHz Fast Run}, 1 = 1\text{ Hz Single-Step}$).
+  - `SW[7]`   : 4-Entry Victim Cache Enable ($0 = \text{Disabled}, 1 = \text{Enabled}$).
 * **8-Digit 7-Segment Hex Display:** Multiplexed display driver (`perf_profiler.v`) operating at ~190 Hz refresh rate for flicker-free real-time profiling.
-* **Status LEDs (`led[15:0]`):** `led[15]` indicates program completion (done-freeze), `led[14]` indicates memory stall, `led[13:6]` displays PC[9:2], `led[5:3]` indicates active counter, `led[2]` indicates bypass mode, `led[1:0]` indicates latency setting.
+* **Status LEDs (`led[15:0]`):**
+  - `LED[15]` : Program execution completed (sticky done-freeze asserted via mailbox address `0x1000`).
+  - `LED[14]` : Memory stall indicator (asserts during cache miss refill, eviction, or bypass access).
+  - `LED[13:8]`: Program Counter bits [7:2] (visualizes instruction execution flow).
+  - `LED[7]`  : Victim Cache Enable indicator (`SW[7]`).
+  - `LED[6]`  : Slow single-step clock mode active indicator (`SW[6]`).
+  - `LED[5:3]`: Active profiler counter selector (`SW[5:3]`).
+  - `LED[2]`  : Cache bypass mode active indicator (`SW[2]`).
+  - `LED[1:0]`: Latency setting indicator (`SW[1:0]`).
 
 ### 2. Full-System Verification & Benchmark Evaluation (`make test_benchmarks`)
 
-Four RISC-V workloads were evaluated across Cache ON vs Cache Bypassed at $N = 10$ DRAM latency:
+#### Experiment 1: L1 Cache Active vs Cache Bypass ($N = 10$ Memory Latency)
 
 ```text
 ========================================================================================
@@ -361,6 +374,19 @@ rw_persistence     | Cache ON   | 662      | 512      | 22/5         | 81.5%    
 ========================================================================================
 ```
 
+#### Experiment 2: Memory Latency Scaling Sweep ($N = 1, 5, 10, 20$ cycles)
+
+```text
+==============================================================================
+Latency Setting              | Array Sum (Cache ON)   | Array Sum (Bypassed)  
+------------------------------------------------------------------------------
+N=1  (Zero-benefit baseline) | 1880 cycles (stalls: 51 ) | 2607 cycles (stalls: 778)
+N=5  (Moderate latency)      | 2033 cycles (stalls: 204) | 4947 cycles (stalls: 3118)
+N=10 (Default DRAM latency)  | 3563 cycles (stalls: 1734)| 28347 cycles (stalls: 26518)
+N=20 (High latency penalty)  | 5263 cycles (stalls: 3434)| 54347 cycles (stalls: 52518)
+==============================================================================
+```
+
 ### 3. Quantitative Targets vs Measured Results
 
 | Goal (TA Requirements) | Target | Measured Result | Status |
@@ -371,6 +397,53 @@ rw_persistence     | Cache ON   | 662      | 512      | 22/5         | 81.5%    
 | **Dirty Persistence** | Correct reload after eviction | **83.1%** | **EXCEEDED** |
 | **Hit Latency** | 0 stall cycles | **0 stall cycles** | **MET** |
 | **Victim Swap Latency** | $\le 2$ stall cycles | **2 stall cycles** | **MET** |
+| **Automated Test Coverage** | 100% automated regression pass | **5,840 / 5,840 checks passed** | **MET** |
+
+### 4. Automated Master Regression Scorecard
+
+```text
+================================================================================
+  AUTOMATED REGRESSION SCORECARD (python3 scripts/run_automated_regression.py)
+================================================================================
+Test Suite                                                   | Checks   | Status | Time  
+--------------------------------------------------------------------------------
+L1 Cache & 4-Entry Victim Cache Unit Tests                   | 41       | PASS   |  0.06s
+Unified Memory Subsystem Unit Tests (mem_subsystem.v)        | 14       | PASS   |  0.03s
+RV32M Hardware Multiplier/Divider Verification               | 5568     | PASS   |  0.51s
+CPU Pipeline Random & Directed Program Suite (FAST=0 & 1)    | 204      | PASS   |  3.40s
+Full Integrated System Simulation (CPU + L1 + VC + Profiler) | 1        | PASS   |  0.13s
+Digilent Nexys A7-100T Top-Level Hardware Integration (top_fpga.v) | 8  | PASS   |  0.13s
+Workload Benchmark Suite (array_sum, vector_dot, conflict, rw) | 4      | PASS   |  1.42s
+--------------------------------------------------------------------------------
+TOTAL AUTOMATED CHECKS: 5,840 PASSED | 0 FAILED
+TOTAL EXECUTION TIME  : 5.67 seconds
+================================================================================
+```
+
+---
+
+## FPGA Demonstration Guide (Nexys A7-100T)
+
+### Step-by-Step Demo Script for Mini Demo (27 Oct):
+1. **Show Normal Execution (Cache ON)**:
+   - Configure switches: `SW[7:0] = 8'b10000001` (Victim Cache ON, 50 MHz fast clock, $N=10$ latency, Cache ON).
+   - Press **BTNC** push button (Reset).
+   - `LED[15]` turns ON immediately (Done).
+   - Read 7-segment display (`SW[5:3] = 000`): displays `00000DEB` (~3,563 cycles).
+2. **Demonstrate Cache Bypass Penalty (Proving Cache Necessity)**:
+   - Flip `SW[2] = 1` (Bypass mode).
+   - Press **BTNC** push button (Reset).
+   - Read 7-segment display: jumps to `00006EBB` (~28,347 cycles) — an **8x execution time increase** without L1 cache!
+3. **Inspect Real-Time Profiler Counters**:
+   - Flip `SW[5:3]` to cycle through the counters:
+     - `001`: Retired instructions / stalls
+     - `010`: Total L1 memory accesses (258 accesses)
+     - `011`: L1 cache hits (241 hits $\to$ **93.4% Hit Rate**)
+     - `100`: Victim cache hits
+4. **Visual Single-Stepping**:
+   - Flip `SW[6] = 1` (1 Hz human clock mode).
+   - Press **BTNC** (Reset).
+   - Observe `LED[13:8]` stepping through PC addresses once per second.
 
 ---
 
