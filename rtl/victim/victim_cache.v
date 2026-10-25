@@ -21,6 +21,7 @@ module victim_cache #(
 )(
     input  wire                              clk,
     input  wire                              rst,
+    input  wire                              vc_en,
 
     // ------------------------------------------------------------------------
     // Combinational Lookup Interface (From L1 Cache Controller)
@@ -72,7 +73,7 @@ module victim_cache #(
 
         for (i = 0; i < NUM_ENTRIES; i = i + 1) begin
             // 1. Check if lookup_addr hits in any valid entry
-            if (valid_bits[i] && (tag_array[i] == lookup_tag)) begin
+            if (vc_en && valid_bits[i] && (tag_array[i] == lookup_tag)) begin
                 vc_hit      = 1'b1;
                 vc_hit_data = data_array[i];
                 hit_idx     = i[1:0];
@@ -107,6 +108,12 @@ module victim_cache #(
                 tag_array[k]  <= {FULL_TAG_BITS{1'b0}};
                 data_array[k] <= {LINE_WIDTH{1'b0}};
                 lru_age[k]    <= k[1:0]; // Strict initial permutation: 0, 1, 2, 3
+            end
+        end else if (!vc_en) begin
+            // Hardware Bypass Mode: keep all entries invalid so no stale data persists
+            for (k = 0; k < NUM_ENTRIES; k = k + 1) begin
+                valid_bits[k] <= 1'b0;
+                lru_age[k]    <= k[1:0];
             end
         end else if (swap_valid && vc_hit) begin
             // Atomic Block Swap: Replace hitting VC entry with displaced L1 block
