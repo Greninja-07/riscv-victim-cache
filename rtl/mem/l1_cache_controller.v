@@ -63,7 +63,19 @@ module l1_cache_controller #(
     output reg                               victim_evict_valid,
     output reg                               victim_swap_valid,
     output reg  [ADDR_WIDTH-1:0]             victim_evict_addr,
-    output reg  [BLOCK_WORDS*DATA_WIDTH-1:0] victim_evict_data
+    output reg  [BLOCK_WORDS*DATA_WIDTH-1:0] victim_evict_data,
+
+    // ------------------------------------------------------------------------
+    // Stride Prefetcher Interface (Interface for Archit's Prefetcher in Week 5)
+    // ------------------------------------------------------------------------
+    output wire                              prefetch_snoop_valid,
+    output wire [ADDR_WIDTH-1:0]             prefetch_snoop_addr,
+    output wire                              prefetch_snoop_miss,
+
+    input  wire                              prefetch_req,
+    input  wire [ADDR_WIDTH-1:0]             prefetch_addr,
+    input  wire [BLOCK_WORDS*DATA_WIDTH-1:0] prefetch_data,
+    output reg                               prefetch_ack
 );
 
     localparam LINE_WIDTH = BLOCK_WORDS * DATA_WIDTH; // 128 bits
@@ -102,6 +114,10 @@ module l1_cache_controller #(
     wire [TAG_BITS-1:0]   latched_tag      = latched_addr[ADDR_WIDTH-1 : ADDR_WIDTH-TAG_BITS];
     wire [INDEX_BITS-1:0] latched_index    = latched_addr[ADDR_WIDTH-TAG_BITS-1 : BLOCK_BITS];
     wire [1:0]            latched_word_sel = latched_addr[3:2];
+
+    // Prefetch Address Decomposition
+    wire [TAG_BITS-1:0]   pref_tag   = prefetch_addr[ADDR_WIDTH-1 : ADDR_WIDTH-TAG_BITS];
+    wire [INDEX_BITS-1:0] pref_index = prefetch_addr[ADDR_WIDTH-TAG_BITS-1 : BLOCK_BITS];
 
     // Address sent to Victim Cache for parallel tag lookup
     assign victim_lookup_addr = (state == IDLE)
@@ -155,6 +171,11 @@ module l1_cache_controller #(
     assign l1_hit    = (state == IDLE) && cpu_req && !cache_bypass && cache_hit;
     assign l1_miss   = (state == IDLE) && cpu_req && !cache_bypass && !cache_hit;
     assign vc_hit_o  = (state == IDLE) && cpu_req && !cache_bypass && !cache_hit && victim_hit;
+
+    // Stride prefetcher snoop bus (tracks memory access stream to train prefetch tables)
+    assign prefetch_snoop_valid = (state == IDLE) && cpu_req && !cache_bypass;
+    assign prefetch_snoop_addr  = cpu_addr;
+    assign prefetch_snoop_miss  = (state == IDLE) && cpu_req && !cache_bypass && !cache_hit;
 
     // Registers for cache bypass transactions
     reg [DATA_WIDTH-1:0]  bypass_rdata;
@@ -219,6 +240,7 @@ module l1_cache_controller #(
             victim_evict_valid <= 1'b0;
             victim_evict_addr  <= 0;
             victim_evict_data  <= 0;
+            prefetch_ack       <= 1'b0;
             for (j = 0; j < NUM_LINES; j = j + 1) begin
                 valid_bits[j] <= 1'b0;
                 dirty_bits[j] <= 1'b0;
@@ -295,6 +317,20 @@ module l1_cache_controller #(
                     data_array[latched_index] <= mem_rdata;
                     dirty_bits[latched_index] <= 1'b0;
                 end
+            end else if (state == IDLE && !cpu_req && prefetch_req) begin
+                // 4. Opportunistic Prefetch Refill when pipeline is idle
+                if (!(valid_bits[pref_index] && dirty_bits[pref_index])) begin
+                    data_array[pref_index] <= prefetch_data;
+                    tag_array[pref_index]  <= pref_tag;
+                    valid_bits[pref_index] <= 1'b1;
+                    dirty_bits[pref_index] <= 1'b0;
+                    prefetch_ack           <= 1'b1;
+                end
+            end
+
+            // Auto-clear prefetch_ack
+            if (!(state == IDLE && !cpu_req && prefetch_req)) begin
+                prefetch_ack <= 1'b0;
             end
         end
     end
