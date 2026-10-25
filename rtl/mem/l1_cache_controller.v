@@ -87,6 +87,7 @@ module l1_cache_controller #(
     reg [DATA_WIDTH-1:0]  latched_wdata;
     reg [3:0]             latched_wmask;
     reg                   latched_we;
+    reg                   latched_vc_hit;
 
     wire [TAG_BITS-1:0]   latched_tag      = latched_addr[ADDR_WIDTH-1 : ADDR_WIDTH-TAG_BITS];
     wire [INDEX_BITS-1:0] latched_index    = latched_addr[ADDR_WIDTH-TAG_BITS-1 : BLOCK_BITS];
