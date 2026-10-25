@@ -7,11 +7,13 @@ VVP      ?= vvp
 PYTHON   ?= python3
 
 # Directories
-RTL_CORE = rtl/core
-RTL_MEM  = rtl/mem
-RTL_TOP  = rtl/top
-TB_DIR   = tb
-SCRIPTS  = scripts
+RTL_CORE   = rtl/core
+RTL_MEM    = rtl/mem
+RTL_VICTIM = rtl/victim
+RTL_PERF   = rtl/perf
+RTL_TOP    = rtl/top
+TB_DIR     = tb
+SCRIPTS    = scripts
 
 # Simulation binaries and artifacts
 SIM_L1   = sim_l1
@@ -22,8 +24,8 @@ SIM_CPU  = sim_cpu
 all: test_all
 
 # Target: sim_l1 - Compile and run L1 Cache Controller unit testbench
-sim_l1: $(RTL_MEM)/l1_cache_controller.v $(RTL_MEM)/main_memory.v $(TB_DIR)/tb_l1_cache.v
-	$(IVERILOG) -g2005 -o $(SIM_L1) $(RTL_MEM)/l1_cache_controller.v $(RTL_MEM)/main_memory.v $(TB_DIR)/tb_l1_cache.v
+sim_l1: $(RTL_MEM)/l1_cache_controller.v $(RTL_MEM)/main_memory.v $(RTL_VICTIM)/victim_cache.v $(TB_DIR)/tb_l1_cache.v
+	$(IVERILOG) -g2005 -o $(SIM_L1) $(RTL_MEM)/l1_cache_controller.v $(RTL_MEM)/main_memory.v $(RTL_VICTIM)/victim_cache.v $(TB_DIR)/tb_l1_cache.v
 	$(VVP) $(SIM_L1)
 
 # Target: sim_md - Run RV32M hardware multiplier/divider unit tests
