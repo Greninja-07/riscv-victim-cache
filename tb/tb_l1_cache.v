@@ -96,7 +96,14 @@ module tb_l1_cache;
         .victim_evict_valid(victim_evict_valid),
         .victim_swap_valid (victim_swap_valid),
         .victim_evict_addr (victim_evict_addr),
-        .victim_evict_data (victim_evict_data)
+        .victim_evict_data (victim_evict_data),
+        .prefetch_snoop_valid(),
+        .prefetch_snoop_addr(),
+        .prefetch_snoop_miss(),
+        .prefetch_req      (1'b0),
+        .prefetch_addr     (32'h0),
+        .prefetch_data     (128'h0),
+        .prefetch_ack      ()
     );
 
     // ------------------------------------------------------------------------
