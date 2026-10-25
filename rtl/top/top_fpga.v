@@ -1,117 +1,252 @@
 `timescale 1ns / 1ps
 
+// ============================================================================
+// Module: top_fpga
+// Project: RV32I Memory Hierarchy Enhancement with Victim Cache & Prefetcher
+// Target: Digilent Nexys A7-100T (Artix-7 XC7A100T-1CSG324C)
+// Author: Abhishek Kumar & Team (Group 14)
+//
+// Description:
+//   Top-level FPGA integration for the Week 3 Demonstration Milestone:
+//   - RV32IM 3-stage Pipelined Processor Core (pipe.v)
+//   - 16 KB Synchronous Instruction Memory BRAM (instr_mem)
+//   - Memory Subsystem (mem_subsystem.v):
+//       * 2 KB Direct-Mapped L1 Data Cache (l1_cache_controller.v)
+//       * Configurable Latency Main Memory BRAM (main_memory.v)
+//       * Hardware Cache-Bypass Mode (SW[2])
+//       * Runtime Selectable Latency (SW[1:0]: N = 1, 5, 10, 20 cycles)
+//   - Hardware Performance Profiler (perf_profiler.v):
+//       * 6 saturating 32-bit hardware event counters
+//       * Sticky done-freeze capture
+//       * Multiplexed 8-digit 7-segment hex display
+//       * Slide switch counter selector (SW[5:3])
+// ============================================================================
+
 module top_fpga #(
     parameter IMEMSIZE = 16384,
     parameter DMEMSIZE = 16384
 )(
-    input  wire clk,        // fast board clock (e.g. 100 MHz)
-    input  wire reset,      // active-high at the pin: BTNC (N17), pressed = reset. Core gets ~reset (active-low).
- 
-    output [15:0] led
+    input  wire        clk,          // 100 MHz oscillator (pin E3)
+    input  wire        reset,        // Active-high push button BTNC (pin N17)
+    input  wire [15:0] sw,           // 16 slide switches
+
+    output wire [15:0] led,          // 16 user LEDs
+    output wire [6:0]  seg,          // 7-segment active-low cathodes
+    output wire [7:0]  an,           // 8-digit active-low anodes
+    output wire        dp            // Decimal point cathode
 );
 
-wire [15:0] pc_disp = pipe_u.inst_fetch_pc[15:0];
-wire exception;
+    // ------------------------------------------------------------------------
+    // Switch Mapping
+    // ------------------------------------------------------------------------
+    // SW[1:0] : Memory Latency selection (00: N=1, 01: N=5, 10: N=10, 11: N=20)
+    // SW[2]   : Hardware Cache Bypass (0 = L1 Cache Enabled, 1 = Bypassed/Uncached)
+    // SW[5:3] : Performance Counter Display Selector on 7-Segment Display:
+    //             000: Total Cycles
+    //             001: Memory Stall Cycles
+    //             010: L1 Cache Accesses
+    //             011: L1 Cache Misses
+    //             100: Victim Cache Hits
+    //             101: Prefetch Hits
+    // SW[6]   : Clock mode (0 = 50 MHz fast CPU execution, 1 = 1 Hz human slow clock)
+    // ------------------------------------------------------------------------
+    wire [1:0] latency_sel  = sw[1:0];
+    wire       cache_bypass = sw[2];
+    wire [2:0] prof_sw      = sw[5:3];
+    wire       slow_clk_sel = sw[6];
 
-////////////////////////////////////////////////////////////
-// Slow clock generator (clock divider)
-////////////////////////////////////////////////////////////
-// 100 MHz → 1 Hz clock divider (Nexys A7)
-////////////////////////////////////////////////////////////
-reg [25:0] clk_cnt;     // enough for 50 million
-reg     slow_clk;
+    // ------------------------------------------------------------------------
+    // Clock Generation
+    // Nexys A7 provides 100 MHz at pin E3.
+    // cpu_clk_50m : 50 MHz generated via clean 2-divider
+    // cpu_clk_1hz : 1 Hz generated via 50-million divider for visual stepping
+    // ------------------------------------------------------------------------
+    reg cpu_clk_50m = 1'b0;
+    always @(posedge clk) begin
+        cpu_clk_50m <= ~cpu_clk_50m;
+    end
 
-always @(posedge clk or posedge reset) begin
-    if (reset) begin
-        clk_cnt  <= 26'd0;
-        slow_clk <= 1'b0;
-    end else begin
-        if (clk_cnt == 26'd49_999_999) begin
-            clk_cnt  <= 26'd0;
-            slow_clk <= ~slow_clk;   // toggle every 0.5 sec
+    reg [25:0] clk_cnt = 26'd0;
+    reg        cpu_clk_1hz = 1'b0;
+    always @(posedge clk or posedge reset) begin
+        if (reset) begin
+            clk_cnt     <= 26'd0;
+            cpu_clk_1hz <= 1'b0;
         end else begin
-            clk_cnt <= clk_cnt + 1'b1;
+            if (clk_cnt == 26'd49_999_999) begin
+                clk_cnt     <= 26'd0;
+                cpu_clk_1hz <= ~cpu_clk_1hz;
+            end else begin
+                clk_cnt <= clk_cnt + 1'b1;
+            end
         end
     end
-end
 
-////////////////////////////////////////////////////////////
-// PIPE ↔ MEMORY WIRES
-////////////////////////////////////////////////////////////
-wire [31:0] inst_mem_read_data;
-wire        inst_mem_is_valid;
+    wire cpu_clk = slow_clk_sel ? cpu_clk_1hz : cpu_clk_50m;
 
-wire [31:0] dmem_read_data;
-wire        dmem_write_valid;
-wire        dmem_read_valid;
+    // Reset synchronization: Core reset is active-low (~reset)
+    reg rst_sync_0 = 1'b1;
+    reg rst_sync_1 = 1'b1;
+    always @(posedge cpu_clk or posedge reset) begin
+        if (reset) begin
+            rst_sync_0 <= 1'b1;
+            rst_sync_1 <= 1'b1;
+        end else begin
+            rst_sync_0 <= 1'b0;
+            rst_sync_1 <= rst_sync_0;
+        end
+    end
+    wire sys_rst_n = ~rst_sync_1;
+    wire sys_rst   = rst_sync_1;
 
-//bugfix: Wires needed to connect pipe to DMEM
-wire        dmem_read_ready;
-wire [31:0] dmem_read_address;
-wire        dmem_write_ready;
-wire [31:0] dmem_write_address;
-wire [31:0] dmem_write_data;
-wire [ 3:0] dmem_write_byte;
-wire [31:0] pc_out;
+    // ------------------------------------------------------------------------
+    // CPU Pipeline Wires
+    // ------------------------------------------------------------------------
+    wire        exception;
+    wire [31:0] pc_out;
+    wire [31:0] inst_mem_read_data;
 
-assign inst_mem_is_valid = 1'b1;
-assign dmem_write_valid  = 1'b1;
-assign dmem_read_valid   = 1'b1;
-assign led = pc_disp;
+    wire        dmem_read_ready;
+    wire [31:0] dmem_read_address;
+    wire        dmem_write_ready;
+    wire [31:0] dmem_write_address;
+    wire [31:0] dmem_write_data;
+    wire [ 3:0] dmem_write_byte;
+    wire [31:0] dmem_read_data;
+    wire        dmem_stall;
 
-////////////////////////////////////////////////////////////
-// PIPELINE CPU
-////////////////////////////////////////////////////////////
-pipe pipe_u (
-    .clk(slow_clk), //bugfix: CPU must run on slow_clk for FPGA visualization
-    .reset(~reset),
-    .stall(1'b0),
-    .exception(exception),
-    .pc_out(pc_out), //bugfix: Connect PC out
+    // Profiler Strobes
+    wire l1_access;
+    wire l1_hit;
+    wire l1_miss;
+    wire vc_hit;
+    wire mem_stall;
+    wire frozen;
 
-    .inst_mem_is_valid(inst_mem_is_valid),
-    .inst_mem_read_data(inst_mem_read_data),
+    // Mailbox termination detection (address 0x1F8 written with 0x1)
+    reg done = 1'b0;
+    always @(posedge cpu_clk or posedge sys_rst) begin
+        if (sys_rst) begin
+            done <= 1'b0;
+        end else begin
+            if (dmem_write_ready && !dmem_stall && (dmem_write_address == 32'h0000_01F8) && (dmem_write_data == 32'h0000_0001)) begin
+                done <= 1'b1;
+            end
+        end
+    end
 
-    .dmem_read_data_temp(dmem_read_data),
-    .dmem_write_valid(dmem_write_valid),
-    .dmem_read_valid(dmem_read_valid),
-    
-    //bugfix: Connecting the newly added memory interface ports
-    .dmem_read_ready(dmem_read_ready),
-    .dmem_read_address(dmem_read_address),
-    .dmem_write_ready(dmem_write_ready),
-    .dmem_write_address(dmem_write_address),
-    .dmem_write_data(dmem_write_data),
-    .dmem_write_byte(dmem_write_byte)
-);
+    // ------------------------------------------------------------------------
+    // Instantiate RV32IM 3-Stage Pipeline Core
+    // ------------------------------------------------------------------------
+    pipe #(
+        .RESET   (32'h0000_0000),
+        .MUL_FAST(1)
+    ) pipe_u (
+        .clk                (cpu_clk),
+        .reset              (sys_rst_n),
+        .stall              (dmem_stall),
+        .exception          (exception),
+        .pc_out             (pc_out),
+        .inst_mem_is_valid  (1'b1),
+        .inst_mem_read_data (inst_mem_read_data),
+        .dmem_read_data_temp(dmem_read_data),
+        .dmem_write_valid   (1'b1),
+        .dmem_read_valid    (1'b1),
+        .dmem_read_ready    (dmem_read_ready),
+        .dmem_read_address  (dmem_read_address),
+        .dmem_write_ready   (dmem_write_ready),
+        .dmem_write_address (dmem_write_address),
+        .dmem_write_data    (dmem_write_data),
+        .dmem_write_byte    (dmem_write_byte)
+    );
 
-////////////////////////////////////////////////////////////
-// INSTRUCTION MEMORY  (matches instr_mem.v)
-////////////////////////////////////////////////////////////
-instr_mem #(
-    .MEM_BYTES(IMEMSIZE)
-) IMEM (
-    .clk(slow_clk), //bugfix: Memory must sync with slow_clk
-    .pc(pc_out), //TODO replaced
-    .instr(inst_mem_read_data)
-);
+    // ------------------------------------------------------------------------
+    // Instantiate 16 KB Instruction Memory (BRAM)
+    // ------------------------------------------------------------------------
+    instr_mem #(
+        .MEM_BYTES(IMEMSIZE),
+        .HEX_FILE ("imem.hex")
+    ) IMEM (
+        .clk  (cpu_clk),
+        .pc   (pc_out),
+        .instr(inst_mem_read_data)
+    );
 
-////////////////////////////////////////////////////////////
-// DATA MEMORY  (matches data_mem.v)
-////////////////////////////////////////////////////////////
-data_mem #(
-    .MEM_BYTES(DMEMSIZE)
-) DMEM (
-    .clk(slow_clk), //bugfix: Memory must sync with slow_clk
+    // ------------------------------------------------------------------------
+    // Instantiate Unified Memory Subsystem (L1 Cache + Configurable Latency BRAM)
+    // ------------------------------------------------------------------------
+    mem_subsystem #(
+        .ADDR_WIDTH (32),
+        .DATA_WIDTH (32),
+        .MEM_BYTES  (DMEMSIZE),
+        .INIT_FILE  ("dmem.hex"),
+        .LATENCY    (10)
+    ) mem_subsystem_inst (
+        .clk                 (cpu_clk),
+        .rst                 (sys_rst),
+        .latency_sel         (latency_sel),
+        .cache_bypass        (cache_bypass),
+        .victim_cache_en     (sw[6]),
+        .dmem_read_ready     (dmem_read_ready),
+        .dmem_read_address   (dmem_read_address),
+        .dmem_write_ready    (dmem_write_ready),
+        .dmem_write_address  (dmem_write_address),
+        .dmem_write_data     (dmem_write_data),
+        .dmem_write_byte     (dmem_write_byte),
+        .dmem_read_data      (dmem_read_data),
+        .dmem_stall          (dmem_stall),
+        .l1_access           (l1_access),
+        .l1_hit              (l1_hit),
+        .l1_miss             (l1_miss),
+        .vc_hit              (vc_hit),
+        .mem_stall           (mem_stall),
+        .prefetch_snoop_valid(),
+        .prefetch_snoop_addr (),
+        .prefetch_snoop_miss (),
+        .prefetch_req        (1'b0),
+        .prefetch_addr       (32'b0),
+        .prefetch_data       (128'b0),
+        .prefetch_ack        ()
+    );
 
-    .re(dmem_read_ready),       // TODO replaced
-    .raddr(dmem_read_address),  // TODO replaced
-    .rdata(dmem_read_data),
+    // ------------------------------------------------------------------------
+    // Instantiate Hardware Performance Profiler & 7-Segment Display Driver
+    // Runs on fast 100 MHz board clock for flicker-free display multiplexing
+    // ------------------------------------------------------------------------
+    perf_profiler #(
+        .REFRESH_BITS(19) // ~190 Hz refresh at 100 MHz
+    ) profiler_inst (
+        .clk         (clk),
+        .rst         (sys_rst),
+        .done        (done),
+        .mem_stall   (mem_stall),
+        .l1_access   (l1_access),
+        .l1_hit      (l1_hit),
+        .l1_miss     (l1_miss),
+        .victim_hit  (vc_hit),
+        .prefetch_hit(1'b0),
+        .sw          (prof_sw),
+        .seg         (seg),
+        .an          (an),
+        .dp          (dp),
+        .frozen      (frozen)
+    );
 
-    .we(dmem_write_ready),      //TODO replaced
-    .waddr(dmem_write_address), //TODO replaced
-    .wdata(dmem_write_data),    //TODO replaced
-    .wstrb(dmem_write_byte)     //TODO replaced
-);
+    // ------------------------------------------------------------------------
+    // Status LEDs
+    // ------------------------------------------------------------------------
+    // led[15]    : Program done / frozen flag
+    // led[14]    : Memory stall indicator
+    // led[13:6]  : Program Counter bits [9:2]
+    // led[5:3]   : Active 7-segment counter selector (prof_sw)
+    // led[2]     : Cache Bypass indicator (sw[2])
+    // led[1:0]   : Latency setting (sw[1:0])
+    // ------------------------------------------------------------------------
+    assign led[15]   = frozen;
+    assign led[14]   = mem_stall;
+    assign led[13:6] = pc_out[9:2];
+    assign led[5:3]  = prof_sw;
+    assign led[2]    = cache_bypass;
+    assign led[1:0]  = latency_sel;
 
 endmodule
