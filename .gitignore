@@ -8,6 +8,8 @@
 # Simulation executables & temporary artifacts
 cache_sim
 sim_l1
+sim_mem
+sim_system
 sim_cpu
 sim_test
 sim_pp
