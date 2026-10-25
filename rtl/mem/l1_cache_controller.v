@@ -214,23 +214,27 @@ module l1_cache_controller #(
             state <= next_state;
 
             // Latch request parameters on cold / conflict miss
-            if (state == IDLE && cpu_req && !cache_hit) begin
-                latched_addr  <= cpu_addr;
-                latched_wdata <= cpu_wdata;
-                latched_wmask <= cpu_wmask;
-                latched_we    <= cpu_we;
+            // Default: de-assert 1-cycle eviction push pulse
+            victim_evict_valid <= 1'b0;
 
-                // If existing line is dirty, capture eviction info for victim cache
-                // Pulse victim_evict_valid for 1 cycle on ANY valid line eviction (clean or dirty)
-                if (state == IDLE && cpu_req && !cache_hit && valid_bits[req_index]) begin
+            // Latch request parameters on L1 miss
+            if (state == IDLE && cpu_req && !cache_hit) begin
+                latched_addr   <= cpu_addr;
+                latched_wdata  <= cpu_wdata;
+                latched_wmask  <= cpu_wmask;
+                latched_we     <= cpu_we;
+                latched_vc_hit <= victim_hit;
+
+                // Capture displaced L1 block for Victim Cache push or swap
+                if (valid_bits[req_index]) begin
+                    victim_evict_addr <= {tag_array[req_index], req_index, {BLOCK_BITS{1'b0}}};
+                    victim_evict_data <= data_array[req_index];
+                    // Only pulse eviction push if Victim Cache missed;
+                    // if it hit, VC_SWAP will perform an atomic swap instead
+                    if (!victim_hit) begin
                         victim_evict_valid <= 1'b1;
-                        victim_evict_addr  <= {tag_array[req_index], req_index, {BLOCK_BITS{1'b0}}};
-                        victim_evict_data  <= data_array[req_index];
-                end else begin
-                    victim_evict_valid <= 1'b0;
+                    end
                 end
-            end else if (state == WRITE_BACK && mem_ack) begin
-                victim_evict_valid <= 1'b0;
             end
 
             // Cache Data & Tag Updates
