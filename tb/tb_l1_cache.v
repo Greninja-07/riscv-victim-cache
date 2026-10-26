@@ -27,6 +27,16 @@ module tb_l1_cache;
     reg  [3:0]            cpu_wmask;
     wire [DATA_WIDTH-1:0] cpu_rdata;
     wire                  cpu_stall;
+    reg                   cache_bypass;
+
+    // Stride Prefetcher Signals
+    reg                   prefetch_req;
+    reg  [ADDR_WIDTH-1:0] prefetch_addr;
+    reg  [LINE_WIDTH-1:0] prefetch_data;
+    wire                  prefetch_ack;
+    wire                  prefetch_snoop_valid;
+    wire [ADDR_WIDTH-1:0] prefetch_snoop_addr;
+    wire                  prefetch_snoop_miss;
 
     // Profiling
     wire l1_access;
@@ -78,6 +88,7 @@ module tb_l1_cache;
         .cpu_wmask         (cpu_wmask),
         .cpu_rdata         (cpu_rdata),
         .cpu_stall         (cpu_stall),
+        .cache_bypass      (cache_bypass),
         .l1_access         (l1_access),
         .l1_hit            (l1_hit),
         .l1_miss           (l1_miss),
@@ -94,7 +105,14 @@ module tb_l1_cache;
         .victim_evict_valid(victim_evict_valid),
         .victim_swap_valid (victim_swap_valid),
         .victim_evict_addr (victim_evict_addr),
-        .victim_evict_data (victim_evict_data)
+        .victim_evict_data (victim_evict_data),
+        .prefetch_snoop_valid(prefetch_snoop_valid),
+        .prefetch_snoop_addr (prefetch_snoop_addr),
+        .prefetch_snoop_miss (prefetch_snoop_miss),
+        .prefetch_req      (prefetch_req),
+        .prefetch_addr     (prefetch_addr),
+        .prefetch_data     (prefetch_data),
+        .prefetch_ack      (prefetch_ack)
     );
 
     // ------------------------------------------------------------------------
@@ -249,10 +267,14 @@ module tb_l1_cache;
         $display("  L1 CACHE + 4-ENTRY VICTIM CACHE VERIFICATION SUITE (Group 14)");
         $display("==================================================================");
 
-        clk         = 0;
-        rst         = 1;
-        vc_en       = 1;
-        cpu_req     = 0;
+        clk          = 0;
+        rst          = 1;
+        vc_en        = 1;
+        cache_bypass = 0;
+        prefetch_req = 0;
+        prefetch_addr = 0;
+        prefetch_data = 0;
+        cpu_req      = 0;
         cpu_we      = 0;
         cpu_addr    = 0;
         cpu_wdata   = 0;
@@ -367,6 +389,45 @@ module tb_l1_cache;
             $display("[FAIL] Profiler Counter Mismatch!");
             fail_count = fail_count + 1;
         end
+
+        // --------------------------------------------------------------------
+        // Test 10: Hardware Cache Bypass Verification (SW[2])
+        // --------------------------------------------------------------------
+        $display("\n--- TEST 10: Hardware Cache Bypass Mode (SW[2]) ---");
+        latency_sel  = 2'b01; // N = 10 cycles -> 12 stalls
+        cache_bypass = 1'b1;
+        $display("[SWITCH] cache_bypass = 1'b1 (L1 Cache Bypassed / Uncached)");
+
+        // Uncached read: must take memory latency stall (12 stalls)
+        cpu_read(32'h0000_0060, 32'h4444_0060, 12);
+
+        // Consecutive read to next word in same line:
+        // When cached, this would be 0 stalls. In bypass mode, it MUST stall again!
+        cpu_read(32'h0000_0064, 32'h3333_0064, 12);
+
+        // Uncached write and verification (write miss with bypass = 23 stalls RMW)
+        cpu_write(32'h0000_0060, 32'hDEAD_BEEF, 4'b1111, 23);
+        cpu_read (32'h0000_0060, 32'hDEAD_BEEF, 12);
+
+        cache_bypass = 1'b0;
+        $display("[SWITCH] cache_bypass = 1'b0 (L1 Cache Re-enabled)");
+
+        // --------------------------------------------------------------------
+        // Test 11: Stride Prefetcher Snoop & Opportunistic Refill
+        // --------------------------------------------------------------------
+        $display("\n--- TEST 11: Stride Prefetcher Refill Verification ---");
+        @(posedge clk);
+        prefetch_req  <= 1'b1;
+        prefetch_addr <= 32'h0000_0200;
+        prefetch_data <= {32'hAAAA_0003, 32'hAAAA_0002, 32'hAAAA_0001, 32'hAAAA_0000};
+        @(posedge clk);
+        while (!prefetch_ack) @(posedge clk);
+        @(posedge clk);
+        prefetch_req  <= 1'b0;
+
+        // Now CPU reads 0x0000_0200: must be an instantaneous 0-stall hit!
+        cpu_read(32'h0000_0200, 32'hAAAA_0000, 0);
+        cpu_read(32'h0000_0208, 32'hAAAA_0002, 0);
 
         #50;
         $display("\n==================================================================");

@@ -58,6 +58,7 @@ module pipe #(
     wire                jalr;
     wire                branch;
     reg                 stall_read;
+    wire                unified_stall = stall;
     wire        [31: 0] instruction;     // holds instruction presented to ID
     wire        [31: 0] if_instruction_muxed; // combinational IF-mux output from IF_ID
     wire        [31: 0] reg_rdata2;
@@ -124,7 +125,7 @@ IF_ID IF_ID_stage (
     .inst_mem_read_data (inst_mem_read_data),
 
     // Previously pipe.* signals (now explicit ports)
-    .stall_read_i       (stall_read),
+    .stall_read_i       (unified_stall),
     .md_stall_i         (md_stall),
     .inst_fetch_pc      (inst_fetch_pc),
     .instruction_i      (instruction),
@@ -210,7 +211,7 @@ always @(posedge clk or negedge reset) begin
             regs[i] <= 32'd0; //TODO replaced
     end
     //bugfix: explicitly protect against writing to register 0
-    else if (wb_alu_to_reg && !stall_read && wb_dest_reg_sel != 5'd0) begin 
+    else if (wb_alu_to_reg && !unified_stall && wb_dest_reg_sel != 5'd0) begin 
         regs[wb_dest_reg_sel] <=
             wb_mem_to_reg ? wb_read_data : wb_result; //TODO replaced
     end
@@ -259,7 +260,7 @@ execute #(
     .branch           (branch),
     .arithsubtype     (arithsubtype),
     .mem_to_reg       (mem_to_reg),
-    .stall_read       (stall_read),
+    .stall_read       (unified_stall),
     .dest_reg_sel     (dest_reg_sel),
     .alu_op           (alu_operation),
     .dmem_raddr       (dmem_read_offset),
@@ -323,7 +324,7 @@ execute #(
 always @(posedge clk or negedge reset) begin
     if (!reset)
         fetch_pc <= RESET;
-    else if (!stall_read && !md_stall)
+    else if (!unified_stall && !md_stall)
         fetch_pc <= branch_stall
                      ? fetch_pc + 4
                      : next_pc;
@@ -367,7 +368,7 @@ wb wb_stage (
    // -----------------
    // Connect WB inputs
    // -----------------
-   .stall_read_i       (stall_read),
+   .stall_read_i       (unified_stall),
    .md_stall_i         (md_stall),
    .fetch_pc_i         (fetch_pc),
    
@@ -405,6 +406,6 @@ wb wb_stage (
 
 // While MUL/DIV is busy the IMEM (synchronous read) must keep returning the instruction that is
 // waiting in the ID stage, so re-present its address instead of the (already advanced) fetch_pc.
-assign pc_out = md_stall ? inst_fetch_pc : fetch_pc;
+assign pc_out = (md_stall || unified_stall) ? inst_fetch_pc : fetch_pc;
 
 endmodule
