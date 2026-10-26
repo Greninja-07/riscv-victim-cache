@@ -7,13 +7,7 @@
 
 # Simulation executables & temporary artifacts
 cache_sim
-sim_l1
-sim_mem
-sim_system
-sim_top
-sim_cpu
-sim_test
-sim_pp
+sim_*
 md0
 md1
 *.vcd
@@ -33,6 +27,8 @@ __pycache__/
 *.dcp
 *.bit
 *.bin
+clockInfo.txt
+dfx_runtime.txt
 fsm_encoding.os
 .Xil/
 *.runs/
