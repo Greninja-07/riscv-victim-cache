@@ -1,14 +1,14 @@
 # ==============================================================================
-# Vivado Bitstream Generation TCL Script for RVM32I / Nexys A7 100T
-# Top-level Module: top_fpga
-# Target FPGA Part: xc7a100tcsg324-1 (Digilent Nexys A7 100T)
+# Vivado Bitstream Generation TCL Script for RVM32I with Victim Cache
+# Target Board: Digilent Nexys A7 100T (xc7a100tcsg324-1)
+# Top Module: top_fpga
 # ==============================================================================
 
 set SCRIPT_DIR [file normalize [file dirname [info script]]]
 set PROJ_DIR   [file normalize "$SCRIPT_DIR/.."]
 
 puts "======================================================================"
-puts " Starting Vivado Bitstream Generation Flow for RVM32I"
+puts " Starting Vivado Bitstream Generation Flow for RVM32I + Victim Cache"
 puts " Project Root Directory : $PROJ_DIR"
 puts " Target Device           : xc7a100tcsg324-1"
 puts " Top Module              : top_fpga"
@@ -17,28 +17,48 @@ puts "======================================================================"
 # Set target FPGA part
 set_part xc7a100tcsg324-1
 
-# Create reports and output directory
+# Create reports directory
 file mkdir "$PROJ_DIR/reports"
 
 # ------------------------------------------------------------------------------
-# 1. Read Design Sources (RTL)
+# 0. Preload Default FPGA Demo Workload (conflict_thrash)
+# ------------------------------------------------------------------------------
+cd $PROJ_DIR
+if {![file exists "$PROJ_DIR/imem.hex"] || ![file exists "$PROJ_DIR/mem128.hex"]} {
+    puts "\n--> \[0/6\] Preloading default demonstration workload (conflict_thrash)..."
+    file copy -force "$PROJ_DIR/sw/conflict_thrash_imem.hex"   "$PROJ_DIR/imem.hex"
+    file copy -force "$PROJ_DIR/sw/conflict_thrash_mem128.hex" "$PROJ_DIR/mem128.hex"
+    file copy -force "$PROJ_DIR/sw/conflict_thrash_dmem.hex"   "$PROJ_DIR/dmem.hex"
+}
+
+# ------------------------------------------------------------------------------
+# 1. Read Design Sources (RTL Hierarchy)
 # ------------------------------------------------------------------------------
 puts "\n--> \[1/6\] Reading Verilog Design Sources..."
-cd $PROJ_DIR
-
 read_verilog [list \
-    "$PROJ_DIR/opcode.vh" \
-    "$PROJ_DIR/IF_ID.v" \
-    "$PROJ_DIR/execute.v" \
-    "$PROJ_DIR/muldiv.v" \
-    "$PROJ_DIR/wb.v" \
-    "$PROJ_DIR/memory.v" \
-    "$PROJ_DIR/pipeline.v" \
-    "$PROJ_DIR/top_fpga.v" \
+    "$PROJ_DIR/rtl/core/opcode.vh" \
+    "$PROJ_DIR/rtl/core/IF_ID.v" \
+    "$PROJ_DIR/rtl/core/execute.v" \
+    "$PROJ_DIR/rtl/core/muldiv.v" \
+    "$PROJ_DIR/rtl/core/wb.v" \
+    "$PROJ_DIR/rtl/core/pipeline.v" \
+    "$PROJ_DIR/rtl/mem/memory.v" \
+    "$PROJ_DIR/rtl/mem/main_memory.v" \
+    "$PROJ_DIR/rtl/mem/l1_cache_controller.v" \
+    "$PROJ_DIR/rtl/victim/victim_cache.v" \
+    "$PROJ_DIR/rtl/mem/mem_subsystem.v" \
+    "$PROJ_DIR/rtl/perf/perf_profiler.v" \
+    "$PROJ_DIR/rtl/top/top_fpga.v" \
 ]
 
-# Set include directory so `include "opcode.vh"` resolves properly
-set_property include_dirs [list "$PROJ_DIR"] [current_fileset]
+set INC_DIRS [list \
+    "$PROJ_DIR/rtl/core" \
+    "$PROJ_DIR/rtl/mem" \
+    "$PROJ_DIR/rtl/victim" \
+    "$PROJ_DIR/rtl/perf" \
+    "$PROJ_DIR/rtl/top" \
+]
+set_property include_dirs $INC_DIRS [current_fileset]
 
 # ------------------------------------------------------------------------------
 # 2. Read Constraints (XDC)
@@ -47,10 +67,10 @@ puts "\n--> \[2/6\] Reading Constraint Files..."
 read_xdc "$PROJ_DIR/constraints/nexys_a7.xdc"
 
 # ------------------------------------------------------------------------------
-# 3. Synthesis (Full Top-Level, not out-of-context)
+# 3. Synthesis (Full Top-Level)
 # ------------------------------------------------------------------------------
 puts "\n--> \[3/6\] Running Synthesis for top_fpga..."
-synth_design -top top_fpga -part xc7a100tcsg324-1 -include_dirs [list "$PROJ_DIR"]
+synth_design -top top_fpga -part xc7a100tcsg324-1 -include_dirs $INC_DIRS
 
 puts "Generating Post-Synthesis Utilization Report..."
 report_utilization -file "$PROJ_DIR/reports/post_synth_utilization.rpt"
