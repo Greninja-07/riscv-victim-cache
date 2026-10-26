@@ -226,6 +226,30 @@ module l1_cache_controller #(
     endfunction
 
     // ------------------------------------------------------------------------
+    // Synchronous data array writes (No async reset -> Infers Distributed LUTRAM)
+    always @(posedge clk) begin
+        if (state == IDLE && cpu_req && !cache_bypass && cache_hit && cpu_we) begin
+            data_array[req_index] <= apply_byte_write(data_array[req_index], req_word_sel, cpu_wdata, cpu_wmask);
+        end else if (state == VC_SWAP) begin
+            if (latched_we) begin
+                data_array[latched_index] <= apply_byte_write(victim_hit_data, latched_word_sel, latched_wdata, latched_wmask);
+            end else begin
+                data_array[latched_index] <= victim_hit_data;
+            end
+        end else if (state == ALLOCATE && mem_ack) begin
+            if (latched_we) begin
+                data_array[latched_index] <= apply_byte_write(mem_rdata, latched_word_sel, latched_wdata, latched_wmask);
+            end else begin
+                data_array[latched_index] <= mem_rdata;
+            end
+        end else if (state == IDLE && !cpu_req && prefetch_req) begin
+            if (!(valid_bits[pref_index] && dirty_bits[pref_index])) begin
+                data_array[pref_index] <= prefetch_data;
+            end
+        end
+    end
+
+    // ------------------------------------------------------------------------
     // FSM Sequential Logic
     // ------------------------------------------------------------------------
     integer j;
@@ -241,6 +265,8 @@ module l1_cache_controller #(
             victim_evict_addr  <= 0;
             victim_evict_data  <= 0;
             prefetch_ack       <= 1'b0;
+            bypass_rdata       <= 32'd0;
+            bypass_wline       <= 128'd0;
             for (j = 0; j < NUM_LINES; j = j + 1) begin
                 valid_bits[j] <= 1'b0;
                 dirty_bits[j] <= 1'b0;
@@ -288,39 +314,23 @@ module l1_cache_controller #(
                 end
             end
 
-            // Cache Data & Tag Updates
+            // Tag & Valid/Dirty Status Updates (data_array updated in synchronous RAM block)
             if (state == IDLE && cpu_req && !cache_bypass && cache_hit && cpu_we) begin
                 // 1. L1 Write Hit
-                data_array[req_index] <= apply_byte_write(data_array[req_index], req_word_sel, cpu_wdata, cpu_wmask);
                 dirty_bits[req_index] <= 1'b1;
             end else if (state == VC_SWAP) begin
                 // 2. Victim Cache Hit Refill (1-Cycle Hardware Swap)
                 valid_bits[latched_index] <= 1'b1;
                 tag_array[latched_index]  <= latched_tag;
-
-                if (latched_we) begin
-                    data_array[latched_index] <= apply_byte_write(victim_hit_data, latched_word_sel, latched_wdata, latched_wmask);
-                    dirty_bits[latched_index] <= 1'b1;
-                end else begin
-                    data_array[latched_index] <= victim_hit_data;
-                    dirty_bits[latched_index] <= 1'b0;
-                end
+                dirty_bits[latched_index] <= latched_we;
             end else if (state == ALLOCATE && mem_ack) begin
                 // 3. Main Memory Miss Refill
                 valid_bits[latched_index] <= 1'b1;
                 tag_array[latched_index]  <= latched_tag;
-
-                if (latched_we) begin
-                    data_array[latched_index] <= apply_byte_write(mem_rdata, latched_word_sel, latched_wdata, latched_wmask);
-                    dirty_bits[latched_index] <= 1'b1;
-                end else begin
-                    data_array[latched_index] <= mem_rdata;
-                    dirty_bits[latched_index] <= 1'b0;
-                end
+                dirty_bits[latched_index] <= latched_we;
             end else if (state == IDLE && !cpu_req && prefetch_req) begin
                 // 4. Opportunistic Prefetch Refill when pipeline is idle
                 if (!(valid_bits[pref_index] && dirty_bits[pref_index])) begin
-                    data_array[pref_index] <= prefetch_data;
                     tag_array[pref_index]  <= pref_tag;
                     valid_bits[pref_index] <= 1'b1;
                     dirty_bits[pref_index] <= 1'b0;
