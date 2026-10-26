@@ -1,0 +1,22 @@
+// Initial instruction memory content for RVM32I FPGA demo
+// Tests simple register operations, additions, and loop
+00100093 // addi x1, x0, 1
+00200113 // addi x2, x0, 2
+002081b3 // add  x3, x1, x2
+00318233 // add  x4, x3, x3
+004202b3 // add  x5, x4, x4
+00528333 // add  x6, x5, x5
+006303b3 // add  x7, x6, x6
+00738433 // add  x8, x7, x7
+008404b3 // add  x9, x8, x8
+00948533 // add  x10, x9, x9
+00a505b3 // add  x11, x10, x10
+00b58633 // add  x12, x11, x11
+00c606b3 // add  x13, x12, x12
+00d68733 // add  x14, x13, x13
+00e707b3 // add  x15, x14, x14
+0000006f // jal  x0, -0 (infinite loop at the end)
+00000013 // nop
+00000013 // nop
+00000013 // nop
+00000013 // nop
