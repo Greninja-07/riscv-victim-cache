@@ -1,13 +1,49 @@
-# Vivado generated files
-.Xil/
-*.log
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Simulation executables & temporary artifacts
+cache_sim
+sim_l1
+sim_mem
+sim_system
+sim_top
+sim_cpu
+sim_test
+sim_pp
+md0
+md1
+*.vcd
+*.vvp
+md_vec.txt
+*.hex
+!sw/*.hex
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+
+# Vivado outputs
 *.jou
+*.log
 *.str
 *.dcp
 *.bit
 *.bin
 fsm_encoding.os
+.Xil/
+*.runs/
+*.cache/
+*.hw/
+*.ip_user_files/
+*.sim/
 
 # Reports and temporary runs
 reports/
 .cache/
+
+# Scratch directory
+scratch/
