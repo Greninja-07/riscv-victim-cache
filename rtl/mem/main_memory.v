@@ -95,12 +95,28 @@ module main_memory #(
         end
     end
 
+    // Synchronous memory array access (No async reset -> Infers Block RAM)
+    wire mem_do_write = (state == S_IDLE && mem_req && !mem_ack && active_latency <= 1 && mem_we) ||
+                        (state == S_BUSY && counter == 1 && latched_we);
+    wire mem_do_read  = (state == S_IDLE && mem_req && !mem_ack && active_latency <= 1 && !mem_we) ||
+                        (state == S_BUSY && counter == 1 && !latched_we);
+    wire [$clog2(MEM_DEPTH)-1:0] access_idx = (state == S_IDLE) ? mem_addr[$clog2(MEM_BYTES)-1:4] : block_idx;
+    wire [DATA_WIDTH-1:0]        access_wdata = (state == S_IDLE) ? mem_wdata : latched_wdata;
+
+    always @(posedge clk) begin
+        if (mem_do_write) begin
+            storage[access_idx] <= access_wdata;
+        end
+        if (mem_do_read) begin
+            mem_rdata <= storage[access_idx];
+        end
+    end
+
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             state         <= S_IDLE;
             counter       <= 0;
             mem_ack       <= 0;
-            mem_rdata     <= 0;
             latched_addr  <= 0;
             latched_wdata <= 0;
             latched_we    <= 0;
@@ -116,11 +132,6 @@ module main_memory #(
                         if (active_latency <= 1) begin
                             // Fast 1-cycle acknowledgment (N = 1 baseline)
                             mem_ack <= 1'b1;
-                            if (mem_we) begin
-                                storage[mem_addr[$clog2(MEM_BYTES)-1:4]] <= mem_wdata;
-                            end else begin
-                                mem_rdata <= storage[mem_addr[$clog2(MEM_BYTES)-1:4]];
-                            end
                         end else begin
                             counter <= active_latency - 1;
                             state   <= S_BUSY;
@@ -132,11 +143,6 @@ module main_memory #(
                     if (counter == 1) begin
                         mem_ack <= 1'b1;
                         state   <= S_IDLE;
-                        if (latched_we) begin
-                            storage[block_idx] <= latched_wdata;
-                        end else begin
-                            mem_rdata <= storage[block_idx];
-                        end
                     end else begin
                         counter <= counter - 1;
                     end
