@@ -16,6 +16,7 @@ def sw(rs2,rs1,imm): return s(2,rs1,rs2,imm)
 MNEM={'mul':0,'mulh':1,'mulhsu':2,'mulhu':3,'div':4,'divu':5,'rem':6,'remu':7}
 def m(name,rd,rs1,rs2): return r(0x33,MNEM[name],1,rd,rs1,rs2)
 def add(rd,a,b_): return r(0x33,0,0,rd,a,b_)
+def sub(rd,a,b_): return r(0x33,0,0x20,rd,a,b_)
 def li(rd,val):
     val&=0xffffffff
     lo=val&0xfff
