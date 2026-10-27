@@ -180,7 +180,7 @@ module tb_system;
         if ($value$plusargs("LATENCY=%d", arg_lat))
             latency_sel = arg_lat[1:0];
         else
-            latency_sel = 2'b10; // Default N = 10
+            latency_sel = 2'b10; // Default N = 100
 
         #22;
         @(posedge clk);
