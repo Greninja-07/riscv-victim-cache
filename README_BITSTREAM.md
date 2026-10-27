@@ -30,7 +30,7 @@ This guide details the Vivado bitstream generation flow for the RV32IM processor
 | `sw[6]` | `U18` | **Clock Speed**: `0` = 50 MHz fast execution, `1` = 1 Hz human stepping |
 | `sw[5:3]` | `R17`, `R15`, `M13` | **7-Segment Display Counter Selector**: <br>&bull; `000`: Total Cycles<br>&bull; `001`: Memory Stall Cycles<br>&bull; `010`: L1 Cache Accesses<br>&bull; `011`: L1 Cache Misses<br>&bull; `100`: **Victim Cache Hits**<br>&bull; `101`: Prefetch Hits |
 | `sw[2]` | `M13` | **Hardware Cache Bypass**: `0` = L1 enabled, `1` = Uncached |
-| `sw[1:0]` | `L16`, `J15` | **Memory Latency Penalty**: `00` = N=1, `01` = N=5, `10` = N=10, `11` = N=20 |
+| `sw[1:0]` | `L16`, `J15` | **Memory Latency Penalty**: `00` = N=1, `01` = N=10, `10` = N=100, `11` = N=200 |
 
 ### Status LEDs (`led[15:0]`)
 | LED | Pin | Description |

@@ -2,7 +2,7 @@
 """
 run_benchmarks.py - Automated Performance Benchmarking Suite
 Evaluates RV32IM CPU with L1 Data Cache vs Uncached Cache-Bypass
-across configurable memory latencies (N = 1, 5, 10, 20 cycles).
+across configurable memory latencies (N = 1, 10, 100, 200 cycles).
 """
 
 import os
@@ -128,16 +128,17 @@ def main():
     compile_sim()
     print("[INFO] Compilation successful!")
 
-    # Latencies to test: 2'b10 (N=10 default) and 2'b00 (N=1 baseline)
+    # Dynamic switch latencies (SW[1:0]):
+    # 2'b00: N=1 (baseline), 2'b01: N=10 (L2), 2'b10: N=100 (DRAM), 2'b11: N=200 (worst-case)
     LATENCIES = [
-        (2, 10, "N=10 (Default DRAM)"),
-        (0, 1,  "N=1  (Zero-benefit baseline)"),
-        (1, 5,  "N=5  (Moderate latency)"),
-        (3, 20, "N=20 (High latency)")
+        (0, 1,   "N=1   (Zero-benefit baseline)"),
+        (1, 10,  "N=10  (L2-like latency)"),
+        (2, 100, "N=100 (Default DRAM latency)"),
+        (3, 200, "N=200 (High latency penalty)")
     ]
 
     print("\n" + "=" * 78)
-    print("  EXPERIMENT 1: L1 CACHE ENABLED VS CACHE BYPASS (N = 10 cycles)")
+    print("  EXPERIMENT 1: L1 CACHE ENABLED VS CACHE BYPASS (N = 100 cycles)")
     print("=" * 78)
 
     all_passed = True
@@ -172,7 +173,7 @@ def main():
         print("-" * 88)
 
     print("\n" + "=" * 78)
-    print("  EXPERIMENT 2: LATENCY PENALTY SCALING (N = 1, 5, 10, 20)")
+    print("  EXPERIMENT 2: LATENCY PENALTY SCALING (N = 1, 10, 100, 200)")
     print("=" * 78)
     print(f"{'Latency Mode':<28} | {'Array Sum (Cache ON)':<22} | {'Array Sum (Bypassed)':<22}")
     print("-" * 78)

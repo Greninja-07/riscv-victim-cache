@@ -14,7 +14,7 @@
 //       * 2 KB Direct-Mapped L1 Data Cache (l1_cache_controller.v)
 //       * Configurable Latency Main Memory BRAM (main_memory.v)
 //       * Hardware Cache-Bypass Mode (SW[2])
-//       * Runtime Selectable Latency (SW[1:0]: N = 1, 5, 10, 20 cycles)
+//       * Runtime Selectable Latency (SW[1:0]: N = 1, 10, 100, 200 cycles)
 //   - Hardware Performance Profiler (perf_profiler.v):
 //       * 6 saturating 32-bit hardware event counters
 //       * Sticky done-freeze capture
@@ -41,7 +41,7 @@ module top_fpga #(
     // ------------------------------------------------------------------------
     // Switch Mapping
     // ------------------------------------------------------------------------
-    // SW[1:0] : Memory Latency selection (00: N=1, 01: N=5, 10: N=10, 11: N=20)
+    // SW[1:0] : Memory Latency selection (00: N=1, 01: N=10, 10: N=100, 11: N=200)
     // SW[2]   : Hardware Cache Bypass (0 = L1 Cache Enabled, 1 = Bypassed/Uncached)
     // SW[5:3] : Performance Counter Display Selector on 7-Segment Display:
     //             000: Total Cycles
