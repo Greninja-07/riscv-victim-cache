@@ -25,11 +25,12 @@
  */
 
 #define MEM_BASE     0x00000000
-#define MAILBOX_DONE 0x00001000
-#define RESULT_OP0   0x00001004
-#define RESULT_OP1   0x00001008
-#define RESULT_OP2   0x0000100C
-#define RESULT_OP3   0x00001010
+#define RESULT_OP0   0x000001F0  // Matrix Inversion * B (14)
+#define RESULT_OP1   0x000001F4  // Vector Dot-Product   (70)
+#define RESULT_OP2   0x000001E8  // Array Accumulation   (136)
+#define RESULT_OP3   0x000001EC  // Strided Transpose    (680)
+#define MAILBOX_DONE 0x000001F8  // Program Done Flag    (1)
+#define RESULT_TOTAL 0x000001FC  // Combined Checksum    (900)
 
 // Memory-mapped volatile pointers
 #define REG32(addr) (*((volatile unsigned int *)(addr)))
@@ -56,10 +57,6 @@ int op0_matrix_inv_mult(int a00, int a01, int a10, int a11,
     int adj11 = a00;
 
     // 3. Matrix multiplication: adj(A) * B
-    // c00 = adj00*b00 + adj01*b10
-    // c01 = adj00*b01 + adj01*b11
-    // c10 = adj10*b00 + adj11*b10
-    // c11 = adj10*b01 + adj11*b11
     int c00 = (adj00 * b00) + (adj01 * b10);
     int c01 = (adj00 * b01) + (adj01 * b11);
     int c10 = (adj10 * b00) + (adj11 * b10);
@@ -71,38 +68,30 @@ int op0_matrix_inv_mult(int a00, int a01, int a10, int a11,
     int res10 = c10 / det;
     int res11 = c11 / det;
 
-    // Return combined checksum
+    // Return sum of elements (3 + 4 + 1 + 6 = 14)
     return (res00 + res01 + res10 + res11);
 }
 
 // ============================================================================
-// Operation 1: 2D Spatial Filter / Matrix Convolution
+// Operation 1: Vector Dot-Product (RV32M MUL + Accumulate)
 // ============================================================================
-// Computes weighted sum over adjacent array elements (Spatial Locality)
-int op1_spatial_convolution(const int *data, int size) {
+int op1_vector_dot(const int *v1, const int *v2, int len) {
     int sum = 0;
-    for (int i = 1; i < size - 1; i++) {
-        // 3-point Laplacian / smoothing kernel: [1, -2, 1]
-        int val = data[i - 1] - (2 * data[i]) + data[i + 1];
-        sum += (val > 0) ? val : -val;
+    for (int i = 0; i < len; i++) {
+        sum += v1[i] * v2[i];
     }
-    return sum;
+    return sum; // (1*5 + 2*6 + 3*7 + 4*8 = 70)
 }
 
 // ============================================================================
-// Operation 2: Polynomial Horner's Method with Division
+// Operation 2: 1D Spatial Array Sum (Spatial Locality)
 // ============================================================================
-int op2_polynomial_eval(int x) {
-    // P(x) = 3*x^3 - 5*x^2 + 7*x + 11
-    int res = 3;
-    res = (res * x) - 5;
-    res = (res * x) + 7;
-    res = (res * x) + 11;
-
-    // Division check
-    int quotient  = res / 7;
-    int remainder = res % 7;
-    return quotient + remainder;
+int op2_array_sum(const int *arr, int len) {
+    int sum = 0;
+    for (int i = 0; i < len; i++) {
+        sum += arr[i];
+    }
+    return sum; // 1 + 2 + ... + 16 = 136
 }
 
 // ============================================================================
@@ -118,47 +107,42 @@ int op3_strided_transpose(const int *src, int *dst, int dim) {
             checksum += val;
         }
     }
-    return checksum;
+    return checksum; // 680
 }
 
 // ============================================================================
 // Main Entry Point
 // ============================================================================
 void _start(void) {
-    // Input matrices for A^-1 * B
-    // A = [ 4,  2 ]   -> det = 4*5 - 2*3 = 14
-    //     [ 3,  5 ]
-    // B = [ 14, 28 ]
-    //     [ 14, 42 ]
+    // 1. Operation 0: Matrix Inversion & Multiplication (A^-1 * B)
     int r0 = op0_matrix_inv_mult(4, 2, 3, 5, 14, 28, 14, 42);
-    REG32(RESULT_OP0) = r0;
+    REG32(RESULT_OP0) = r0; // 14
 
-    // Data buffer for Op 1 & Op 3 (placed in data memory)
-    volatile int *buffer_src = (volatile int *)0x00000400;
-    volatile int *buffer_dst = (volatile int *)0x00000800;
+    // 2. Operation 1: Vector Dot-Product
+    const int v1[4] = {1, 2, 3, 4};
+    const int v2[4] = {5, 6, 7, 8};
+    int r1 = op1_vector_dot(v1, v2, 4);
+    REG32(RESULT_OP1) = r1; // 70
 
-    // Initialize buffer with test values
-    for (int i = 0; i < 32; i++) {
-        buffer_src[i] = (i * 17) + 3;
-    }
+    // 3. Operation 2: Array Sum (Spatial Locality)
+    volatile int *arr_buf = (volatile int *)0x00000600;
+    int r2 = op2_array_sum((const int *)arr_buf, 16);
+    REG32(RESULT_OP2) = r2; // 136
 
-    // Execute Op 1 (Spatial Convolution)
-    int r1 = op1_spatial_convolution((const int *)buffer_src, 32);
-    REG32(RESULT_OP1) = r1;
+    // 4. Operation 3: Strided 4x4 Transpose (Benchmark for Stride Prefetcher)
+    volatile int *src_buf = (volatile int *)0x00000400;
+    volatile int *dst_buf = (volatile int *)0x00000500;
+    int r3 = op3_strided_transpose((const int *)src_buf, (int *)dst_buf, 4);
+    REG32(RESULT_OP3) = r3; // 680
 
-    // Execute Op 2 (Polynomial Evaluation at x = 9)
-    int r2 = op2_polynomial_eval(9);
-    REG32(RESULT_OP2) = r2;
+    // 5. Grand Total Checksum
+    int total = r0 + r1 + r2 + r3;
+    REG32(RESULT_TOTAL) = total; // 900
 
-    // Execute Op 3 (Strided 4x4 Transpose)
-    int r3 = op3_strided_transpose((const int *)buffer_src, (int *)buffer_dst, 4);
-    REG32(RESULT_OP3) = r3;
-
-    // Signal completion via Mailbox
+    // 6. Signal completion via Mailbox
     REG32(MAILBOX_DONE) = 0x00000001;
 
     // Terminal loop
     while (1) {
-        // Halt / wait for reset
     }
 }

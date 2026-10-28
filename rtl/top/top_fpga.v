@@ -54,11 +54,13 @@ module top_fpga #(
     // SW[6]   : Clock mode (0 = 50 MHz fast CPU execution, 1 = 1 Hz human slow clock)
     // SW[7]   : Victim Cache Enable (0 = Disabled, 1 = Enabled)
     // SW[8]   : Prefetcher Enable toggle (0 = Disabled, 1 = Enabled)
-    // SW[10:9]: Operation Result Selector (when SW[5:3] = 110):
-    //             00: Op 0 Result (Matrix Inverse * B)
-    //             01: Op 1 Result (Strided Transpose Sum)
-    //             10: Combined Total Checksum
-    //             11: Program Done Flag
+    // SW[11:9]: Operation Result Selector (when SW[5:3] = 110):
+    //             000: Op 0 Result (Matrix Inverse * B)
+    //             001: Op 1 Result (Vector Dot Product)
+    //             010: Op 2 Result (Array Accumulation)
+    //             011: Op 3 Result (Strided Transpose Sum)
+    //             100: Grand Total Checksum
+    //             101: Program Done Flag
     // ------------------------------------------------------------------------
     wire [1:0] latency_sel     = sw[1:0];
     wire       cache_bypass    = sw[2];
@@ -66,7 +68,7 @@ module top_fpga #(
     wire       slow_clk_sel    = sw[6];
     wire       victim_cache_en = sw[7];
     wire       prefetch_en     = sw[8];
-    wire [1:0] op_sel          = sw[10:9];
+    wire [2:0] op_sel          = sw[11:9];
 
     // ------------------------------------------------------------------------
     // Clock Generation
@@ -138,19 +140,35 @@ module top_fpga #(
 
     // Mailbox termination & result capture
     reg done = 1'b0;
-    reg [31:0] op0_result      = 32'd0;
-    reg [31:0] combined_result = 32'd0;
+    reg [31:0] op0_result      = 32'd0; // Op 0: Matrix Inversion * B (0x1F0)
+    reg [31:0] op1_result      = 32'd0; // Op 1: Vector Dot-Product   (0x1F4)
+    reg [31:0] op2_result      = 32'd0; // Op 2: Array Accumulation   (0x1E8)
+    reg [31:0] op3_result      = 32'd0; // Op 3: Strided Transpose    (0x1EC)
+    reg [31:0] combined_result = 32'd0; // Combined Grand Total       (0x1FC)
+
     always @(posedge cpu_clk or posedge sys_rst) begin
         if (sys_rst) begin
             done            <= 1'b0;
             op0_result      <= 32'd0;
+            op1_result      <= 32'd0;
+            op2_result      <= 32'd0;
+            op3_result      <= 32'd0;
             combined_result <= 32'd0;
         end else if (dmem_write_ready && !dmem_stall) begin
             if (dmem_write_address == 32'h0000_01F8 && dmem_write_data == 32'h0000_0001) begin
                 done <= 1'b1;
             end
-            if (dmem_write_address == 32'h0000_01F4) begin
+            if (dmem_write_address == 32'h0000_01F0) begin
                 op0_result <= dmem_write_data;
+            end
+            if (dmem_write_address == 32'h0000_01F4) begin
+                op1_result <= dmem_write_data;
+            end
+            if (dmem_write_address == 32'h0000_01E8) begin
+                op2_result <= dmem_write_data;
+            end
+            if (dmem_write_address == 32'h0000_01EC) begin
+                op3_result <= dmem_write_data;
             end
             if (dmem_write_address == 32'h0000_01FC) begin
                 combined_result <= dmem_write_data;
@@ -158,10 +176,13 @@ module top_fpga #(
         end
     end
 
-    wire [31:0] selected_op_result = (op_sel == 2'b00) ? op0_result :
-                                     (op_sel == 2'b01) ? (combined_result - op0_result) :
-                                     (op_sel == 2'b10) ? combined_result :
-                                     {31'd0, done};
+    wire [31:0] selected_op_result = (op_sel == 3'b000) ? op0_result :
+                                     (op_sel == 3'b001) ? op1_result :
+                                     (op_sel == 3'b010) ? op2_result :
+                                     (op_sel == 3'b011) ? op3_result :
+                                     (op_sel == 3'b100) ? combined_result :
+                                     (op_sel == 3'b101) ? {31'd0, done} :
+                                     32'h0000_0000;
 
     // ------------------------------------------------------------------------
     // Instantiate RV32IM 3-Stage Pipeline Core
@@ -266,8 +287,8 @@ module top_fpga #(
     // ------------------------------------------------------------------------
     // led[15]    : Program done / frozen flag
     // led[14]    : Memory stall indicator
-    // led[13:11] : Program Counter bits [7:5]
-    // led[10:9]  : Active Operation selected (sw[10:9])
+    // led[13:12] : Program Counter bits [6:5]
+    // led[11:9]  : Active Operation selected (sw[11:9])
     // led[8]     : Prefetcher Enable indicator (sw[8])
     // led[7]     : Victim Cache Enable indicator (sw[7])
     // led[6]     : Clock mode indicator (sw[6])
@@ -277,8 +298,8 @@ module top_fpga #(
     // ------------------------------------------------------------------------
     assign led[15]    = frozen;
     assign led[14]    = mem_stall;
-    assign led[13:11] = pc_out[7:5];
-    assign led[10:9]  = op_sel;
+    assign led[13:12] = pc_out[6:5];
+    assign led[11:9]  = op_sel;
     assign led[8]     = prefetch_en;
     assign led[7]     = victim_cache_en;
     assign led[6]     = slow_clk_sel;
