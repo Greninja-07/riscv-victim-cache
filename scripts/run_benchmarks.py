@@ -40,8 +40,8 @@ WORKLOADS = [
     },
     {
         "name": "complex_ops",
-        "desc": "Matrix Inversion (A^-1 * B) + Strided Transpose (RV32M MUL/DIV)",
-        "expected": 694,
+        "desc": "Matrix Inversion + Vector Dot + Array Sum + Strided Transpose",
+        "expected": 900,
     }
 ]
 

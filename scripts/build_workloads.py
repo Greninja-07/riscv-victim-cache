@@ -301,17 +301,21 @@ def build_rw_persistence():
 
 def build_complex_ops():
     """
-    Workload 5: Multi-Operation Complex Kernel (Matrix Inversion*B + Strided Transpose)
-    - Operation 0: Computes A^-1 * B where A is a 2x2 matrix, det = 14, B is 2x2.
-                   Uses RV32M MUL, SUB, and DIV instructions.
-    - Operation 1: Strided Transpose of 4x4 matrix across 4 cache lines with stride=16 bytes.
-                   Benchmark designed specifically to evaluate the Stride Prefetcher!
+    Workload 5: Multi-Operation Complex Kernel
+    - Operation 0: Matrix Inversion & Multiplication (A^-1 * B), det = 14, sum = 14
+    - Operation 1: Vector Dot-Product (V1 . V2) using RV32M MUL, sum = 70
+    - Operation 2: 1D Array Accumulation (Spatial Locality), sum = 136
+    - Operation 3: Strided Transpose of 4x4 matrix (Stride = 16 bytes = 1 cache line), sum = 680
+    - Grand Total: 14 + 70 + 136 + 680 = 900
     """
-    ADDR_A = 0x0300
-    ADDR_B = 0x0340
-    ADDR_C = 0x0380
-    ADDR_S = 0x0400
-    ADDR_D = 0x0500
+    ADDR_A   = 0x0300
+    ADDR_B   = 0x0340
+    ADDR_C   = 0x0380
+    ADDR_V1  = 0x03A0
+    ADDR_V2  = 0x03B0
+    ADDR_ARR = 0x0600
+    ADDR_S   = 0x0400
+    ADDR_D   = 0x0500
 
     instrs = []
 
@@ -375,11 +379,33 @@ def build_complex_ops():
     instrs.append(asm.add(18, 18, 15))
     instrs.append(asm.add(18, 18, 16)) # x18 = 14
 
-    # --- Part 2: Strided 4x4 Matrix Traversal (Stride = 16 bytes = 1 line) ---
+    # --- Part 2: Vector Dot-Product (x25 = 70) ---
+    instrs.extend(asm.li(28, ADDR_V1))
+    instrs.extend(asm.li(29, ADDR_V2))
+    instrs.extend(asm.li(25, 0)) # dot_sum = 0
+    for i in range(4):
+        instrs.append(asm.lw(30, 28, i * 4))
+        instrs.append(asm.lw(31, 29, i * 4))
+        instrs.append(asm.m('mul', 30, 30, 31))
+        instrs.append(asm.add(25, 25, 30))
+
+    # --- Part 3: 1D Array Accumulation (x26 = 136) ---
+    instrs.extend(asm.li(28, ADDR_ARR))
+    instrs.extend(asm.li(29, 16)) # len = 16
+    instrs.extend(asm.li(26, 0))  # sum = 0
+    loop_arr = len(instrs) * 4
+    instrs.append(asm.lw(30, 28, 0))
+    instrs.append(asm.add(26, 26, 30))
+    instrs.append(asm.addi(28, 28, 4))
+    instrs.append(asm.addi(29, 29, -1))
+    offset_arr = loop_arr - (len(instrs) * 4)
+    instrs.append(asm.b(1, 29, 0, offset_arr))
+
+    # --- Part 4: Strided 4x4 Matrix Traversal (Stride = 16 bytes = 1 line) ---
     # Traverses columns with stride of 16 bytes, loading into x19
     instrs.extend(asm.li(23, ADDR_S))
     instrs.extend(asm.li(24, ADDR_D))
-    instrs.extend(asm.li(10, 0))  # Strided accumulator
+    instrs.extend(asm.li(10, 0))  # Strided accumulator (x10 = 680)
 
     dst_idx = 0
     # Column 0: 0, 16, 32, 48
@@ -410,16 +436,31 @@ def build_complex_ops():
         instrs.append(asm.sw(19, 24, dst_idx * 4))
         dst_idx += 1
 
-    # Combine Part 1 (x18 = 14) and Part 2 (x10 = 680) -> x10 = 694
-    instrs.append(asm.add(10, 10, 18))
+    # --- Store Individual Operation Results into Mailboxes ---
+    # Store Op 0 result (14) at 0x1F0
+    instrs.extend(asm.li(9, 0x1F0))
+    instrs.append(asm.sw(18, 9, 0))
 
-    # Store result at 0x1FC
-    instrs.extend(asm.li(9, 0x1FC))
+    # Store Op 1 result (70) at 0x1F4
+    instrs.extend(asm.li(9, 0x1F4))
+    instrs.append(asm.sw(25, 9, 0))
+
+    # Store Op 2 result (136) at 0x1E8
+    instrs.extend(asm.li(9, 0x1E8))
+    instrs.append(asm.sw(26, 9, 0))
+
+    # Store Op 3 result (680) at 0x1EC
+    instrs.extend(asm.li(9, 0x1EC))
     instrs.append(asm.sw(10, 9, 0))
 
-    # Store Part 1 result (14) at 0x1F4
-    instrs.extend(asm.li(9, 0x1F4))
-    instrs.append(asm.sw(18, 9, 0))
+    # Compute Grand Total Checksum (14 + 70 + 136 + 680 = 900) into x27
+    instrs.append(asm.add(27, 18, 25))
+    instrs.append(asm.add(27, 27, 26))
+    instrs.append(asm.add(27, 27, 10))
+
+    # Store Grand Total at 0x1FC
+    instrs.extend(asm.li(9, 0x1FC))
+    instrs.append(asm.sw(27, 9, 0))
 
     # Write completion flag at 0x1F8
     instrs.extend(asm.li(9, 0x1F8))
@@ -441,6 +482,18 @@ def build_complex_ops():
     dmem[(ADDR_B // 4) + 2] = 14
     dmem[(ADDR_B // 4) + 3] = 42
 
+    # Vector 1: [1, 2, 3, 4]
+    for i in range(4):
+        dmem[(ADDR_V1 // 4) + i] = i + 1
+
+    # Vector 2: [5, 6, 7, 8]
+    for i in range(4):
+        dmem[(ADDR_V2 // 4) + i] = i + 5
+
+    # Array: [1, 2, ..., 16]
+    for i in range(16):
+        dmem[(ADDR_ARR // 4) + i] = i + 1
+
     # Strided Source Matrix 4x4
     stride_sum = 0
     for i in range(16):
@@ -448,7 +501,10 @@ def build_complex_ops():
         dmem[(ADDR_S // 4) + i] = val
         stride_sum += val
 
-    expected_total = 14 + stride_sum  # 14 + 680 = 694
+    expected_total = 14 + 70 + 136 + stride_sum  # 14 + 70 + 136 + 680 = 900
+
+    write_hex_files("complex_ops", instrs, dmem)
+    return expected_total
 
     write_hex_files("complex_ops", instrs, dmem)
     return expected_total
