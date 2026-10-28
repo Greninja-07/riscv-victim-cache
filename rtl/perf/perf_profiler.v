@@ -32,6 +32,7 @@ module perf_profiler #(
     input  wire        victim_hit,   // Hit in victim cache
     input  wire        prefetch_hit, // Useful prefetch hit
     input  wire [2:0]  sw,           // Slide switch counter selector [2:0]
+    input  wire [31:0] custom_val,   // Custom operation result display value (sw=110)
     output reg  [6:0]  seg,          // Active-low cathodes: {CG, CF, CE, CD, CC, CB, CA}
     output reg  [7:0]  an,           // Active-low digit anodes: an[7]=leftmost, an[0]=rightmost
     output wire        dp,           // Decimal point cathode (tied to 1'b1 = inactive/off)
@@ -138,7 +139,7 @@ module perf_profiler #(
             3'b011:  disp_val = l1_misses;
             3'b100:  disp_val = victim_hits;
             3'b101:  disp_val = prefetch_hits;
-            3'b110:  disp_val = 32'h00000000;
+            3'b110:  disp_val = custom_val;
             3'b111:  disp_val = 32'hFFFFFFFF;
             default: disp_val = 32'h00000000;
         endcase
