@@ -61,6 +61,18 @@ module top_fpga #(
     //             011: Op 3 Result (Strided Transpose Sum)
     //             100: Grand Total Checksum
     //             101: Program Done Flag
+    // SW[12]   : Dual Split-Screen Display Mode:
+    //              0 = Standard 32-bit single metric (selected by SW[5:3])
+    //              1 = Dual Split Mode (Left 4 digits = C Program, Right 4 digits = Profiler)
+    // SW[15:13]: Left 4-Digit Display Source (in Split Mode):
+    //              000: Current C Operation Result (matches SW[11:9])
+    //              001: Op 0 Matrix Inversion Result (0x1F0)
+    //              010: Op 1 Vector Dot Product Result (0x1F4)
+    //              011: Op 2 Array Sum Result (0x1E8)
+    //              100: Op 3 Strided Transpose Result (0x1EC)
+    //              101: Combined Grand Total Checksum (0x1FC)
+    //              110: Live Program Counter PC[15:0]
+    //              111: Program Done Flag (0x0001 when completed)
     // ------------------------------------------------------------------------
     wire [1:0] latency_sel     = sw[1:0];
     wire       cache_bypass    = sw[2];
@@ -69,6 +81,8 @@ module top_fpga #(
     wire       victim_cache_en = sw[7];
     wire       prefetch_en     = sw[8];
     wire [2:0] op_sel          = sw[11:9];
+    wire       split_mode      = sw[12];
+    wire [2:0] left_sel        = sw[15:13];
 
     // ------------------------------------------------------------------------
     // Clock Generation
@@ -184,6 +198,16 @@ module top_fpga #(
                                      (op_sel == 3'b101) ? {31'd0, done} :
                                      32'h0000_0000;
 
+    // Left display value generation (selected by SW[15:13] in split mode)
+    wire [15:0] left_display_val = (left_sel == 3'b000) ? selected_op_result[15:0] :
+                                   (left_sel == 3'b001) ? op0_result[15:0] :
+                                   (left_sel == 3'b010) ? op1_result[15:0] :
+                                   (left_sel == 3'b011) ? op2_result[15:0] :
+                                   (left_sel == 3'b100) ? op3_result[15:0] :
+                                   (left_sel == 3'b101) ? combined_result[15:0] :
+                                   (left_sel == 3'b110) ? pc_out[15:0] :
+                                   {15'd0, done};
+
     // ------------------------------------------------------------------------
     // Instantiate RV32IM 3-Stage Pipeline Core
     // ------------------------------------------------------------------------
@@ -276,6 +300,8 @@ module top_fpga #(
         .prefetch_hit(1'b0),
         .sw          (prof_sw),
         .custom_val  (selected_op_result),
+        .split_mode  (split_mode),
+        .left_val    (left_display_val),
         .seg         (seg),
         .an          (an),
         .dp          (dp),
@@ -287,7 +313,8 @@ module top_fpga #(
     // ------------------------------------------------------------------------
     // led[15]    : Program done / frozen flag
     // led[14]    : Memory stall indicator
-    // led[13:12] : Program Counter bits [6:5]
+    // led[13]    : Split-screen mode active indicator (sw[12])
+    // led[12]    : Program Counter bit [5] / live core activity
     // led[11:9]  : Active Operation selected (sw[11:9])
     // led[8]     : Prefetcher Enable indicator (sw[8])
     // led[7]     : Victim Cache Enable indicator (sw[7])
@@ -298,7 +325,8 @@ module top_fpga #(
     // ------------------------------------------------------------------------
     assign led[15]    = frozen;
     assign led[14]    = mem_stall;
-    assign led[13:12] = pc_out[6:5];
+    assign led[13]    = split_mode;
+    assign led[12]    = pc_out[5];
     assign led[11:9]  = op_sel;
     assign led[8]     = prefetch_en;
     assign led[7]     = victim_cache_en;
