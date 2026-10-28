@@ -50,14 +50,23 @@ module top_fpga #(
     //             011: L1 Cache Misses
     //             100: Victim Cache Hits
     //             101: Prefetch Hits
+    //             110: Operation Result (Selected by SW[10:9])
     // SW[6]   : Clock mode (0 = 50 MHz fast CPU execution, 1 = 1 Hz human slow clock)
     // SW[7]   : Victim Cache Enable (0 = Disabled, 1 = Enabled)
+    // SW[8]   : Prefetcher Enable toggle (0 = Disabled, 1 = Enabled)
+    // SW[10:9]: Operation Result Selector (when SW[5:3] = 110):
+    //             00: Op 0 Result (Matrix Inverse * B)
+    //             01: Op 1 Result (Strided Transpose Sum)
+    //             10: Combined Total Checksum
+    //             11: Program Done Flag
     // ------------------------------------------------------------------------
     wire [1:0] latency_sel     = sw[1:0];
     wire       cache_bypass    = sw[2];
     wire [2:0] prof_sw         = sw[5:3];
     wire       slow_clk_sel    = sw[6];
     wire       victim_cache_en = sw[7];
+    wire       prefetch_en     = sw[8];
+    wire [1:0] op_sel          = sw[10:9];
 
     // ------------------------------------------------------------------------
     // Clock Generation
@@ -127,17 +136,32 @@ module top_fpga #(
     wire mem_stall;
     wire frozen;
 
-    // Mailbox termination detection (address 0x1F8 written with 0x1)
+    // Mailbox termination & result capture
     reg done = 1'b0;
+    reg [31:0] op0_result      = 32'd0;
+    reg [31:0] combined_result = 32'd0;
     always @(posedge cpu_clk or posedge sys_rst) begin
         if (sys_rst) begin
-            done <= 1'b0;
-        end else begin
-            if (dmem_write_ready && !dmem_stall && (dmem_write_address == 32'h0000_01F8) && (dmem_write_data == 32'h0000_0001)) begin
+            done            <= 1'b0;
+            op0_result      <= 32'd0;
+            combined_result <= 32'd0;
+        end else if (dmem_write_ready && !dmem_stall) begin
+            if (dmem_write_address == 32'h0000_01F8 && dmem_write_data == 32'h0000_0001) begin
                 done <= 1'b1;
+            end
+            if (dmem_write_address == 32'h0000_01F4) begin
+                op0_result <= dmem_write_data;
+            end
+            if (dmem_write_address == 32'h0000_01FC) begin
+                combined_result <= dmem_write_data;
             end
         end
     end
+
+    wire [31:0] selected_op_result = (op_sel == 2'b00) ? op0_result :
+                                     (op_sel == 2'b01) ? (combined_result - op0_result) :
+                                     (op_sel == 2'b10) ? combined_result :
+                                     {31'd0, done};
 
     // ------------------------------------------------------------------------
     // Instantiate RV32IM 3-Stage Pipeline Core
@@ -230,6 +254,7 @@ module top_fpga #(
         .victim_hit  (vc_hit),
         .prefetch_hit(1'b0),
         .sw          (prof_sw),
+        .custom_val  (selected_op_result),
         .seg         (seg),
         .an          (an),
         .dp          (dp),
@@ -241,20 +266,24 @@ module top_fpga #(
     // ------------------------------------------------------------------------
     // led[15]    : Program done / frozen flag
     // led[14]    : Memory stall indicator
-    // led[13:8]  : Program Counter bits [7:2]
+    // led[13:11] : Program Counter bits [7:5]
+    // led[10:9]  : Active Operation selected (sw[10:9])
+    // led[8]     : Prefetcher Enable indicator (sw[8])
     // led[7]     : Victim Cache Enable indicator (sw[7])
     // led[6]     : Clock mode indicator (sw[6])
     // led[5:3]   : Active 7-segment counter selector (prof_sw)
     // led[2]     : Cache Bypass indicator (sw[2])
     // led[1:0]   : Latency setting (sw[1:0])
     // ------------------------------------------------------------------------
-    assign led[15]   = frozen;
-    assign led[14]   = mem_stall;
-    assign led[13:8] = pc_out[7:2];
-    assign led[7]    = victim_cache_en;
-    assign led[6]    = slow_clk_sel;
-    assign led[5:3]  = prof_sw;
-    assign led[2]    = cache_bypass;
-    assign led[1:0]  = latency_sel;
+    assign led[15]    = frozen;
+    assign led[14]    = mem_stall;
+    assign led[13:11] = pc_out[7:5];
+    assign led[10:9]  = op_sel;
+    assign led[8]     = prefetch_en;
+    assign led[7]     = victim_cache_en;
+    assign led[6]     = slow_clk_sel;
+    assign led[5:3]   = prof_sw;
+    assign led[2]     = cache_bypass;
+    assign led[1:0]   = latency_sel;
 
 endmodule
