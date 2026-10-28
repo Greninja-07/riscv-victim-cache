@@ -33,6 +33,8 @@ module perf_profiler #(
     input  wire        prefetch_hit, // Useful prefetch hit
     input  wire [2:0]  sw,           // Slide switch counter selector [2:0]
     input  wire [31:0] custom_val,   // Custom operation result display value (sw=110)
+    input  wire        split_mode,   // 1 = Dual Split Display (left 4 digits = left_val, right 4 digits = profiler)
+    input  wire [15:0] left_val,     // 16-bit value displayed on digits 7..4 (leftmost)
     output reg  [6:0]  seg,          // Active-low cathodes: {CG, CF, CE, CD, CC, CB, CA}
     output reg  [7:0]  an,           // Active-low digit anodes: an[7]=leftmost, an[0]=rightmost
     output wire        dp,           // Decimal point cathode (tied to 1'b1 = inactive/off)
@@ -171,21 +173,31 @@ module perf_profiler #(
 
     wire [2:0] digit_sel = refresh_counter[REFRESH_BITS-1 : REFRESH_BITS-3];
 
+    // Split-screen nibble formatting:
+    // When split_mode is asserted, digits 7..4 display left_val[15:0] (C result),
+    // and digits 3..0 display disp_val[15:0] (Profiler metric).
+    // Otherwise, all 8 digits display the full 32-bit disp_val.
+    wire [15:0] right_val_16 = disp_val[15:0];
+    wire [15:0] left_val_16  = (split_mode === 1'b1) ? left_val : disp_val[31:16];
+
     // Select active 4-bit nibble based on active digit
     reg [3:0] hex_digit;
     always @(*) begin
         case (digit_sel)
-            3'd0: hex_digit = disp_val[3:0];    // Rightmost digit (an[0])
-            3'd1: hex_digit = disp_val[7:4];
-            3'd2: hex_digit = disp_val[11:8];
-            3'd3: hex_digit = disp_val[15:12];
-            3'd4: hex_digit = disp_val[19:16];
-            3'd5: hex_digit = disp_val[23:20];
-            3'd6: hex_digit = disp_val[27:24];
-            3'd7: hex_digit = disp_val[31:28];  // Leftmost digit (an[7])
+            3'd0: hex_digit = right_val_16[3:0];    // Rightmost digit (an[0])
+            3'd1: hex_digit = right_val_16[7:4];
+            3'd2: hex_digit = right_val_16[11:8];
+            3'd3: hex_digit = right_val_16[15:12];
+            3'd4: hex_digit = left_val_16[3:0];     // Mid-left digit (an[4])
+            3'd5: hex_digit = left_val_16[7:4];
+            3'd6: hex_digit = left_val_16[11:8];
+            3'd7: hex_digit = left_val_16[15:12];   // Leftmost digit (an[7])
             default: hex_digit = 4'h0;
         endcase
     end
+
+    // Active-low decimal point: illuminates on digit 4 in split mode as visual center separator
+    assign dp = (split_mode === 1'b1 && digit_sel == 3'd4) ? 1'b0 : 1'b1;
 
     // Active-low anode decoder: exactly one bit low at a time
     always @(*) begin
@@ -244,9 +256,6 @@ module perf_profiler #(
     always @(*) begin
         seg = hex_to_7seg(hex_digit);
     end
-
-    // Decimal point is tied off to 1'b1 (inactive/off for all digits)
-    assign dp = 1'b1;
 
 endmodule
 
