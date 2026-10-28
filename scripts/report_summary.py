@@ -137,7 +137,11 @@ def print_switch_guide():
     print(f"      - {BOLD}100{RESET} ➔ Combined Checksum           : {BOLD}900{RESET} (`00000384`)")
     print(f"  • {BOLD}Show Cache Speedup to TA:{RESET} Set {CYAN}SW[5:3] = 000{RESET} (Total Cycles):")
     print(f"      - {CYAN}SW[2] = 0{RESET} (Cache ON)       ➔ {BOLD}{GREEN}2,359 cycles{RESET}")
-    print(f"      - {CYAN}SW[2] = 1{RESET} (Cache Bypassed) ➔ {BOLD}{RED}10,595 cycles (~4.5x slower!){RESET}\n")
+    print(f"      - {CYAN}SW[2] = 1{RESET} (Cache Bypassed) ➔ {BOLD}{RED}10,595 cycles (~4.5x slower!){RESET}")
+    print(f"  • {BOLD}Dual Split-Screen Mode (SW[12] = 1):{RESET}")
+    print(f"      - {CYAN}Left 4 Digits (SW[15:13]){RESET}: C Program Result (14, 70, 136, 680, 900, PC)")
+    print(f"      - {CYAN}Right 4 Digits (SW[5:3]){RESET} : Hardware Profiler Metric (Cycles, Stalls, Hits)")
+    print(f"      - {CYAN}Center DP (Digit 4){RESET}      : Illuminates as active separator dot!\n")
 
 if __name__ == "__main__":
     print_banner()
