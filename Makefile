@@ -24,7 +24,7 @@ SIM_CPU    = sim_cpu
 SIM_SYSTEM = sim_system
 SIM_TOP    = sim_top
 
-.PHONY: all test_all sim_l1 sim_mem sim_md sim_cpu test_cpu sim_system sim_top test_benchmarks bitstream clean help
+.PHONY: all test_all sim_l1 sim_mem sim_md sim_cpu test_cpu sim_system sim_top test_benchmarks report bitstream clean help
 
 all: test_all
 
@@ -93,6 +93,10 @@ test_benchmarks:
 
 # Target: test_all - Run all simulation suites
 test_all: sim_l1 sim_mem sim_md sim_cpu test_cpu sim_system sim_top test_benchmarks
+
+# Target: report - Generate executive terminal verification & performance report
+report:
+	$(PYTHON) $(SCRIPTS)/report_summary.py
 
 # Target: bitstream - Synthesize, implement, and generate top_fpga.bit
 bitstream:

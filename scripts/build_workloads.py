@@ -299,11 +299,223 @@ def build_rw_persistence():
     return expected_sum
 
 
+def build_complex_ops():
+    """
+    Workload 5: Multi-Operation Complex Kernel
+    - Operation 0: Matrix Inversion & Multiplication (A^-1 * B), det = 14, sum = 14
+    - Operation 1: Vector Dot-Product (V1 . V2) using RV32M MUL, sum = 70
+    - Operation 2: 1D Array Accumulation (Spatial Locality), sum = 136
+    - Operation 3: Strided Transpose of 4x4 matrix (Stride = 16 bytes = 1 cache line), sum = 680
+    - Grand Total: 14 + 70 + 136 + 680 = 900
+    """
+    ADDR_A   = 0x0300
+    ADDR_B   = 0x0340
+    ADDR_C   = 0x0380
+    ADDR_V1  = 0x03A0
+    ADDR_V2  = 0x03B0
+    ADDR_ARR = 0x0600
+    ADDR_S   = 0x0400
+    ADDR_D   = 0x0500
+
+    instrs = []
+
+    # --- Part 1: Matrix Inversion & Multiplication (A^-1 * B) ---
+    # Load A: a00, a01, a10, a11 into x1, x2, x3, x4
+    instrs.extend(asm.li(20, ADDR_A))
+    instrs.append(asm.lw(1, 20, 0))   # a00 = 4
+    instrs.append(asm.lw(2, 20, 4))   # a01 = 2
+    instrs.append(asm.lw(3, 20, 8))   # a10 = 3
+    instrs.append(asm.lw(4, 20, 12))  # a11 = 5
+
+    # Det = a00*a11 - a01*a10 -> x5
+    instrs.append(asm.m('mul', 5, 1, 4))
+    instrs.append(asm.m('mul', 6, 2, 3))
+    instrs.append(asm.sub(5, 5, 6))   # det = 14
+
+    # Adj(A): adj00 = a11 (x4), adj01 = -a01 (sub x7, x0, x2), adj10 = -a10 (sub x8, x0, x3), adj11 = a00 (x1)
+    instrs.append(asm.sub(7, 0, 2))   # -a01 = -2
+    instrs.append(asm.sub(8, 0, 3))   # -a10 = -3
+
+    # Load B: b00, b01, b10, b11 into x9, x10, x11, x12
+    instrs.extend(asm.li(21, ADDR_B))
+    instrs.append(asm.lw(9, 21, 0))   # b00 = 14
+    instrs.append(asm.lw(10, 21, 4))  # b01 = 28
+    instrs.append(asm.lw(11, 21, 8))  # b10 = 14
+    instrs.append(asm.lw(12, 21, 12)) # b11 = 42
+
+    # c00 = adj00*b00 + adj01*b10 = x4*x9 + x7*x11 -> x13
+    instrs.append(asm.m('mul', 13, 4, 9))
+    instrs.append(asm.m('mul', 14, 7, 11))
+    instrs.append(asm.add(13, 13, 14))
+    instrs.append(asm.m('div', 13, 13, 5)) # c00 = 3
+
+    # c01 = adj00*b01 + adj01*b11 = x4*x10 + x7*x12 -> x14
+    instrs.append(asm.m('mul', 14, 4, 10))
+    instrs.append(asm.m('mul', 15, 7, 12))
+    instrs.append(asm.add(14, 14, 15))
+    instrs.append(asm.m('div', 14, 14, 5)) # c01 = 4
+
+    # c10 = adj10*b00 + adj11*b10 = x8*x9 + x1*x11 -> x15
+    instrs.append(asm.m('mul', 15, 8, 9))
+    instrs.append(asm.m('mul', 16, 1, 11))
+    instrs.append(asm.add(15, 15, 16))
+    instrs.append(asm.m('div', 15, 15, 5)) # c10 = 1
+
+    # c11 = adj10*b01 + adj11*b11 = x8*x10 + x1*x12 -> x16
+    instrs.append(asm.m('mul', 16, 8, 10))
+    instrs.append(asm.m('mul', 17, 1, 12))
+    instrs.append(asm.add(16, 16, 17))
+    instrs.append(asm.m('div', 16, 16, 5)) # c11 = 6
+
+    # Store C matrix to ADDR_C
+    instrs.extend(asm.li(22, ADDR_C))
+    instrs.append(asm.sw(13, 22, 0))
+    instrs.append(asm.sw(14, 22, 4))
+    instrs.append(asm.sw(15, 22, 8))
+    instrs.append(asm.sw(16, 22, 12))
+
+    # x18 = Sum of Matrix Inversion*B = 3 + 4 + 1 + 6 = 14
+    instrs.append(asm.add(18, 13, 14))
+    instrs.append(asm.add(18, 18, 15))
+    instrs.append(asm.add(18, 18, 16)) # x18 = 14
+
+    # --- Part 2: Vector Dot-Product (x25 = 70) ---
+    instrs.extend(asm.li(28, ADDR_V1))
+    instrs.extend(asm.li(29, ADDR_V2))
+    instrs.extend(asm.li(25, 0)) # dot_sum = 0
+    for i in range(4):
+        instrs.append(asm.lw(30, 28, i * 4))
+        instrs.append(asm.lw(31, 29, i * 4))
+        instrs.append(asm.m('mul', 30, 30, 31))
+        instrs.append(asm.add(25, 25, 30))
+
+    # --- Part 3: 1D Array Accumulation (x26 = 136) ---
+    instrs.extend(asm.li(28, ADDR_ARR))
+    instrs.extend(asm.li(29, 16)) # len = 16
+    instrs.extend(asm.li(26, 0))  # sum = 0
+    loop_arr = len(instrs) * 4
+    instrs.append(asm.lw(30, 28, 0))
+    instrs.append(asm.add(26, 26, 30))
+    instrs.append(asm.addi(28, 28, 4))
+    instrs.append(asm.addi(29, 29, -1))
+    offset_arr = loop_arr - (len(instrs) * 4)
+    instrs.append(asm.b(1, 29, 0, offset_arr))
+
+    # --- Part 4: Strided 4x4 Matrix Traversal (Stride = 16 bytes = 1 line) ---
+    # Traverses columns with stride of 16 bytes, loading into x19
+    instrs.extend(asm.li(23, ADDR_S))
+    instrs.extend(asm.li(24, ADDR_D))
+    instrs.extend(asm.li(10, 0))  # Strided accumulator (x10 = 680)
+
+    dst_idx = 0
+    # Column 0: 0, 16, 32, 48
+    for offset in [0, 16, 32, 48]:
+        instrs.append(asm.lw(19, 23, offset))
+        instrs.append(asm.add(10, 10, 19))
+        instrs.append(asm.sw(19, 24, dst_idx * 4))
+        dst_idx += 1
+
+    # Column 1: 4, 20, 36, 52
+    for offset in [4, 20, 36, 52]:
+        instrs.append(asm.lw(19, 23, offset))
+        instrs.append(asm.add(10, 10, 19))
+        instrs.append(asm.sw(19, 24, dst_idx * 4))
+        dst_idx += 1
+
+    # Column 2: 8, 24, 40, 56
+    for offset in [8, 24, 40, 56]:
+        instrs.append(asm.lw(19, 23, offset))
+        instrs.append(asm.add(10, 10, 19))
+        instrs.append(asm.sw(19, 24, dst_idx * 4))
+        dst_idx += 1
+
+    # Column 3: 12, 28, 44, 60
+    for offset in [12, 28, 44, 60]:
+        instrs.append(asm.lw(19, 23, offset))
+        instrs.append(asm.add(10, 10, 19))
+        instrs.append(asm.sw(19, 24, dst_idx * 4))
+        dst_idx += 1
+
+    # --- Store Individual Operation Results into Mailboxes ---
+    # Store Op 0 result (14) at 0x1F0
+    instrs.extend(asm.li(9, 0x1F0))
+    instrs.append(asm.sw(18, 9, 0))
+
+    # Store Op 1 result (70) at 0x1F4
+    instrs.extend(asm.li(9, 0x1F4))
+    instrs.append(asm.sw(25, 9, 0))
+
+    # Store Op 2 result (136) at 0x1E8
+    instrs.extend(asm.li(9, 0x1E8))
+    instrs.append(asm.sw(26, 9, 0))
+
+    # Store Op 3 result (680) at 0x1EC
+    instrs.extend(asm.li(9, 0x1EC))
+    instrs.append(asm.sw(10, 9, 0))
+
+    # Compute Grand Total Checksum (14 + 70 + 136 + 680 = 900) into x27
+    instrs.append(asm.add(27, 18, 25))
+    instrs.append(asm.add(27, 27, 26))
+    instrs.append(asm.add(27, 27, 10))
+
+    # Store Grand Total at 0x1FC
+    instrs.extend(asm.li(9, 0x1FC))
+    instrs.append(asm.sw(27, 9, 0))
+
+    # Write completion flag at 0x1F8
+    instrs.extend(asm.li(9, 0x1F8))
+    instrs.extend(asm.li(8, 1))
+    instrs.append(asm.sw(8, 9, 0))
+    instrs.append(asm.j(0, 0))
+
+    # Populate Data Memory
+    dmem = [0] * NUM_WORDS
+    # Matrix A: [4, 2], [3, 5]
+    dmem[(ADDR_A // 4) + 0] = 4
+    dmem[(ADDR_A // 4) + 1] = 2
+    dmem[(ADDR_A // 4) + 2] = 3
+    dmem[(ADDR_A // 4) + 3] = 5
+
+    # Matrix B: [14, 28], [14, 42]
+    dmem[(ADDR_B // 4) + 0] = 14
+    dmem[(ADDR_B // 4) + 1] = 28
+    dmem[(ADDR_B // 4) + 2] = 14
+    dmem[(ADDR_B // 4) + 3] = 42
+
+    # Vector 1: [1, 2, 3, 4]
+    for i in range(4):
+        dmem[(ADDR_V1 // 4) + i] = i + 1
+
+    # Vector 2: [5, 6, 7, 8]
+    for i in range(4):
+        dmem[(ADDR_V2 // 4) + i] = i + 5
+
+    # Array: [1, 2, ..., 16]
+    for i in range(16):
+        dmem[(ADDR_ARR // 4) + i] = i + 1
+
+    # Strided Source Matrix 4x4
+    stride_sum = 0
+    for i in range(16):
+        val = (i + 1) * 5
+        dmem[(ADDR_S // 4) + i] = val
+        stride_sum += val
+
+    expected_total = 14 + 70 + 136 + stride_sum  # 14 + 70 + 136 + 680 = 900
+
+    write_hex_files("complex_ops", instrs, dmem)
+    return expected_total
+
+    write_hex_files("complex_ops", instrs, dmem)
+    return expected_total
+
+
 if __name__ == "__main__":
     print("Building RISC-V workloads...")
     s1 = build_array_sum()
     s2 = build_vector_dot()
     s3 = build_conflict_thrash()
     s4 = build_rw_persistence()
+    s5 = build_complex_ops()
     print("All workloads built successfully!")
-    print(f"Golden results: array_sum={s1}, vector_dot={s2}, conflict={s3}, rw={s4}")
+    print(f"Golden results: array_sum={s1}, vector_dot={s2}, conflict={s3}, rw={s4}, complex_ops={s5}")

@@ -37,6 +37,11 @@ WORKLOADS = [
         "name": "rw_persistence",
         "desc": "Read-Modify-Write Persistence (Dirty Eviction)",
         "expected": 756,
+    },
+    {
+        "name": "complex_ops",
+        "desc": "Matrix Inversion + Vector Dot + Array Sum + Strided Transpose",
+        "expected": 900,
     }
 ]
 

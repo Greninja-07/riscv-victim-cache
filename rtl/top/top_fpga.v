@@ -50,14 +50,39 @@ module top_fpga #(
     //             011: L1 Cache Misses
     //             100: Victim Cache Hits
     //             101: Prefetch Hits
+    //             110: Operation Result (Selected by SW[10:9])
     // SW[6]   : Clock mode (0 = 50 MHz fast CPU execution, 1 = 1 Hz human slow clock)
     // SW[7]   : Victim Cache Enable (0 = Disabled, 1 = Enabled)
+    // SW[8]   : Prefetcher Enable toggle (0 = Disabled, 1 = Enabled)
+    // SW[11:9]: Operation Result Selector (when SW[5:3] = 110):
+    //             000: Op 0 Result (Matrix Inverse * B)
+    //             001: Op 1 Result (Vector Dot Product)
+    //             010: Op 2 Result (Array Accumulation)
+    //             011: Op 3 Result (Strided Transpose Sum)
+    //             100: Grand Total Checksum
+    //             101: Program Done Flag
+    // SW[12]   : Dual Split-Screen Display Mode:
+    //              0 = Standard 32-bit single metric (selected by SW[5:3])
+    //              1 = Dual Split Mode (Left 4 digits = C Program, Right 4 digits = Profiler)
+    // SW[15:13]: Left 4-Digit Display Source (in Split Mode):
+    //              000: Current C Operation Result (matches SW[11:9])
+    //              001: Op 0 Matrix Inversion Result (0x1F0)
+    //              010: Op 1 Vector Dot Product Result (0x1F4)
+    //              011: Op 2 Array Sum Result (0x1E8)
+    //              100: Op 3 Strided Transpose Result (0x1EC)
+    //              101: Combined Grand Total Checksum (0x1FC)
+    //              110: Live Program Counter PC[15:0]
+    //              111: Program Done Flag (0x0001 when completed)
     // ------------------------------------------------------------------------
     wire [1:0] latency_sel     = sw[1:0];
     wire       cache_bypass    = sw[2];
     wire [2:0] prof_sw         = sw[5:3];
     wire       slow_clk_sel    = sw[6];
     wire       victim_cache_en = sw[7];
+    wire       prefetch_en     = sw[8];
+    wire [2:0] op_sel          = sw[11:9];
+    wire       split_mode      = sw[12];
+    wire [2:0] left_sel        = sw[15:13];
 
     // ------------------------------------------------------------------------
     // Clock Generation
@@ -127,17 +152,61 @@ module top_fpga #(
     wire mem_stall;
     wire frozen;
 
-    // Mailbox termination detection (address 0x1F8 written with 0x1)
+    // Mailbox termination & result capture
     reg done = 1'b0;
+    reg [31:0] op0_result      = 32'd0; // Op 0: Matrix Inversion * B (0x1F0)
+    reg [31:0] op1_result      = 32'd0; // Op 1: Vector Dot-Product   (0x1F4)
+    reg [31:0] op2_result      = 32'd0; // Op 2: Array Accumulation   (0x1E8)
+    reg [31:0] op3_result      = 32'd0; // Op 3: Strided Transpose    (0x1EC)
+    reg [31:0] combined_result = 32'd0; // Combined Grand Total       (0x1FC)
+
     always @(posedge cpu_clk or posedge sys_rst) begin
         if (sys_rst) begin
-            done <= 1'b0;
-        end else begin
-            if (dmem_write_ready && !dmem_stall && (dmem_write_address == 32'h0000_01F8) && (dmem_write_data == 32'h0000_0001)) begin
+            done            <= 1'b0;
+            op0_result      <= 32'd0;
+            op1_result      <= 32'd0;
+            op2_result      <= 32'd0;
+            op3_result      <= 32'd0;
+            combined_result <= 32'd0;
+        end else if (dmem_write_ready && !dmem_stall) begin
+            if (dmem_write_address == 32'h0000_01F8 && dmem_write_data == 32'h0000_0001) begin
                 done <= 1'b1;
+            end
+            if (dmem_write_address == 32'h0000_01F0) begin
+                op0_result <= dmem_write_data;
+            end
+            if (dmem_write_address == 32'h0000_01F4) begin
+                op1_result <= dmem_write_data;
+            end
+            if (dmem_write_address == 32'h0000_01E8) begin
+                op2_result <= dmem_write_data;
+            end
+            if (dmem_write_address == 32'h0000_01EC) begin
+                op3_result <= dmem_write_data;
+            end
+            if (dmem_write_address == 32'h0000_01FC) begin
+                combined_result <= dmem_write_data;
             end
         end
     end
+
+    wire [31:0] selected_op_result = (op_sel == 3'b000) ? op0_result :
+                                     (op_sel == 3'b001) ? op1_result :
+                                     (op_sel == 3'b010) ? op2_result :
+                                     (op_sel == 3'b011) ? op3_result :
+                                     (op_sel == 3'b100) ? combined_result :
+                                     (op_sel == 3'b101) ? {31'd0, done} :
+                                     32'h0000_0000;
+
+    // Left display value generation (selected by SW[15:13] in split mode)
+    wire [15:0] left_display_val = (left_sel == 3'b000) ? selected_op_result[15:0] :
+                                   (left_sel == 3'b001) ? op0_result[15:0] :
+                                   (left_sel == 3'b010) ? op1_result[15:0] :
+                                   (left_sel == 3'b011) ? op2_result[15:0] :
+                                   (left_sel == 3'b100) ? op3_result[15:0] :
+                                   (left_sel == 3'b101) ? combined_result[15:0] :
+                                   (left_sel == 3'b110) ? pc_out[15:0] :
+                                   {15'd0, done};
 
     // ------------------------------------------------------------------------
     // Instantiate RV32IM 3-Stage Pipeline Core
@@ -230,6 +299,9 @@ module top_fpga #(
         .victim_hit  (vc_hit),
         .prefetch_hit(1'b0),
         .sw          (prof_sw),
+        .custom_val  (selected_op_result),
+        .split_mode  (split_mode),
+        .left_val    (left_display_val),
         .seg         (seg),
         .an          (an),
         .dp          (dp),
@@ -241,20 +313,26 @@ module top_fpga #(
     // ------------------------------------------------------------------------
     // led[15]    : Program done / frozen flag
     // led[14]    : Memory stall indicator
-    // led[13:8]  : Program Counter bits [7:2]
+    // led[13]    : Split-screen mode active indicator (sw[12])
+    // led[12]    : Program Counter bit [5] / live core activity
+    // led[11:9]  : Active Operation selected (sw[11:9])
+    // led[8]     : Prefetcher Enable indicator (sw[8])
     // led[7]     : Victim Cache Enable indicator (sw[7])
     // led[6]     : Clock mode indicator (sw[6])
     // led[5:3]   : Active 7-segment counter selector (prof_sw)
     // led[2]     : Cache Bypass indicator (sw[2])
     // led[1:0]   : Latency setting (sw[1:0])
     // ------------------------------------------------------------------------
-    assign led[15]   = frozen;
-    assign led[14]   = mem_stall;
-    assign led[13:8] = pc_out[7:2];
-    assign led[7]    = victim_cache_en;
-    assign led[6]    = slow_clk_sel;
-    assign led[5:3]  = prof_sw;
-    assign led[2]    = cache_bypass;
-    assign led[1:0]  = latency_sel;
+    assign led[15]    = frozen;
+    assign led[14]    = mem_stall;
+    assign led[13]    = split_mode;
+    assign led[12]    = pc_out[5];
+    assign led[11:9]  = op_sel;
+    assign led[8]     = prefetch_en;
+    assign led[7]     = victim_cache_en;
+    assign led[6]     = slow_clk_sel;
+    assign led[5:3]   = prof_sw;
+    assign led[2]     = cache_bypass;
+    assign led[1:0]   = latency_sel;
 
 endmodule

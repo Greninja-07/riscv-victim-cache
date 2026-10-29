@@ -93,15 +93,28 @@ module mem_subsystem #(
     wire                  l1_cpu_stall;
 
     // ------------------------------------------------------------------------
-    // CPU Load / Store Port Arbitration
+    // CPU Load / Store Port Arbitration with Store-Commit State
     // Priority:
-    //   1. Store in WB stage (dmem_write_ready) - must commit write to memory
-    //   2. Load in EX stage (dmem_read_ready)  - stalled if store active same cycle
+    //   1. Store in WB stage (dmem_write_ready) - commits first (stalling load for 1 cycle)
+    //   2. Once store completes, service Load in EX stage (dmem_read_ready)
     // ------------------------------------------------------------------------
-    wire structural_hazard = dmem_write_ready && dmem_read_ready;
+    reg store_serviced;
+    always @(posedge clk or posedge rst) begin
+        if (rst) begin
+            store_serviced <= 1'b0;
+        end else begin
+            if (dmem_write_ready && dmem_read_ready && !l1_cpu_stall && !store_serviced) begin
+                store_serviced <= 1'b1;
+            end else if (!dmem_stall || !dmem_read_ready) begin
+                store_serviced <= 1'b0;
+            end
+        end
+    end
+
+    wire structural_hazard = (dmem_write_ready && dmem_read_ready && !store_serviced);
 
     always @(*) begin
-        if (dmem_write_ready) begin
+        if (dmem_write_ready && !store_serviced) begin
             l1_cpu_req   = 1'b1;
             l1_cpu_we    = 1'b1;
             l1_cpu_addr  = dmem_write_address;

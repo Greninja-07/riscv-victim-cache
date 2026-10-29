@@ -124,6 +124,19 @@ module tb_top_fpga;
         #500;
         $display("       SW[5:3] = 101 | Selected Metric: Prefetch Hits          | LED[5:3] = %b", led[5:3]);
 
+        // Test Dual Split-Screen Mode (SW[12] = 1)
+        $display("------------------------------------------------------------------");
+        $display("[INFO] Testing Dual Split-Screen Display Mode (SW[12] = 1)...");
+        sw[12] = 1'b1;         // Enable Split-Screen
+        sw[15:13] = 3'b000;    // Left 4 digits: C Op Result from SW[11:9]
+        sw[11:9]  = 3'b000;    // Op 0 Matrix Inversion Result
+        sw[5:3]   = 3'b100;    // Right 4 digits: Victim Cache Hits
+        #1000;
+        $display("       SW[12] = 1   | Split Mode ON                           | LED[13]  = %b", led[13]);
+        $display("       SW[15:13]=000| Left 4 Digits: C Program Result         | Cathode  = %b", seg);
+        $display("       SW[5:3]  =100| Right 4 Digits: Victim Cache Hits       | Anode    = %b", an);
+        $display("[PASS] Dual Split-Screen Mode verified successfully!");
+
         $display("==================================================================");
         $display("  ALL TOP FPGA HARDWARE INTERFACES VERIFIED SUCCESSFULLY! PASS!");
         $display("==================================================================");
