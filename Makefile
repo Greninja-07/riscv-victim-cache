@@ -4,7 +4,8 @@
 
 IVERILOG   ?= iverilog
 VVP        ?= vvp
-PYTHON     ?= python
+# Use python3 if available, otherwise fallback to python (e.g. Windows)
+PYTHON     ?= $(shell command -v python3 2>/dev/null || echo python)
 VIVADO     ?= vivado
 TCL_SCRIPT  = scripts/vivado_bitstream.tcl
 
