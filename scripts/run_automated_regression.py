@@ -24,7 +24,13 @@ TEST_SUITES = [
         "name": "Unified Memory Subsystem Unit Tests (mem_subsystem.v)",
         "cmd": ["make", "sim_mem"],
         "expect_str": "STATUS: ALL SUBSYSTEM TESTS PASSED SUCCESSFULLY!",
-        "item_count": 14,
+        "item_count": 22,
+    },
+    {
+        "name": "Hardware Stride Prefetcher Unit Tests (tb_prefetcher.v)",
+        "cmd": ["make", "sim_prefetcher"],
+        "expect_str": "STATUS: ALL PREFETCHER TESTS PASSED SUCCESSFULLY!",
+        "item_count": 19,
     },
     {
         "name": "RV32M Hardware Multiplier/Divider Verification",
@@ -54,7 +60,7 @@ TEST_SUITES = [
         "name": "Workload Benchmark Suite (array_sum, vector_dot, conflict, rw)",
         "cmd": ["make", "test_benchmarks"],
         "expect_str": "ALL BENCHMARK WORKLOADS VERIFIED & MATCH GOLDEN OUTPUTS! PASS!",
-        "item_count": 4,
+        "item_count": 7,
     },
 ]
 

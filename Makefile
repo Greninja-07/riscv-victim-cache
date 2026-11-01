@@ -4,7 +4,7 @@
 
 IVERILOG   ?= iverilog
 VVP        ?= vvp
-PYTHON     ?= python3
+PYTHON     ?= python
 VIVADO     ?= vivado
 TCL_SCRIPT  = scripts/vivado_bitstream.tcl
 
@@ -14,6 +14,7 @@ RTL_MEM    = rtl/mem
 RTL_VICTIM = rtl/victim
 RTL_PERF   = rtl/perf
 RTL_TOP    = rtl/top
+RTL_PREFETCH = rtl/prefetch
 TB_DIR     = tb
 SCRIPTS    = scripts
 
@@ -24,7 +25,7 @@ SIM_CPU    = sim_cpu
 SIM_SYSTEM = sim_system
 SIM_TOP    = sim_top
 
-.PHONY: all test_all sim_l1 sim_mem sim_md sim_cpu test_cpu sim_system sim_top test_benchmarks report bitstream clean help
+.PHONY: all test_all sim_l1 sim_mem sim_prefetcher sim_md sim_cpu test_cpu sim_system sim_top test_benchmarks report bitstream clean help
 
 all: test_all
 
@@ -34,8 +35,8 @@ sim_l1: $(RTL_MEM)/l1_cache_controller.v $(RTL_MEM)/main_memory.v $(RTL_VICTIM)/
 	$(VVP) $(SIM_L1)
 
 # Target: sim_mem - Compile and run Unified Memory Subsystem unit testbench
-sim_mem: $(RTL_MEM)/mem_subsystem.v $(RTL_MEM)/l1_cache_controller.v $(RTL_MEM)/main_memory.v $(RTL_VICTIM)/victim_cache.v $(TB_DIR)/tb_mem_subsystem.v
-	$(IVERILOG) -g2005 -o $(SIM_MEM) $(RTL_MEM)/mem_subsystem.v $(RTL_MEM)/l1_cache_controller.v $(RTL_MEM)/main_memory.v $(RTL_VICTIM)/victim_cache.v $(TB_DIR)/tb_mem_subsystem.v
+sim_mem: $(RTL_MEM)/mem_subsystem.v $(RTL_MEM)/l1_cache_controller.v $(RTL_MEM)/main_memory.v $(RTL_VICTIM)/victim_cache.v $(RTL_PREFETCH)/prefetcher.v $(TB_DIR)/tb_mem_subsystem.v
+	$(IVERILOG) -g2005 -o $(SIM_MEM) $(RTL_MEM)/mem_subsystem.v $(RTL_MEM)/l1_cache_controller.v $(RTL_MEM)/main_memory.v $(RTL_VICTIM)/victim_cache.v $(RTL_PREFETCH)/prefetcher.v $(TB_DIR)/tb_mem_subsystem.v
 	$(VVP) $(SIM_MEM)
 
 # Target: sim_md - Run RV32M hardware multiplier/divider unit tests
@@ -62,29 +63,30 @@ test_cpu: $(RTL_CORE)/pipeline.v $(RTL_CORE)/IF_ID.v $(RTL_CORE)/execute.v $(RTL
 # Target: sim_system - Compile full-system CPU + L1 + Profiler testbench
 sim_system:
 	$(PYTHON) $(SCRIPTS)/build_workloads.py
-	cp sw/array_sum_imem.hex imem.hex
-	cp sw/array_sum_dmem.hex dmem.hex
-	cp sw/array_sum_mem128.hex mem128.hex
-	$(IVERILOG) -g2005 -I $(RTL_CORE) -I $(RTL_MEM) -I $(RTL_PERF) -I $(RTL_VICTIM) -o $(SIM_SYSTEM) \
+	$(PYTHON) -c "import shutil; shutil.copy('sw/array_sum_imem.hex', 'imem.hex'); shutil.copy('sw/array_sum_dmem.hex', 'dmem.hex'); shutil.copy('sw/array_sum_mem128.hex', 'mem128.hex')"
+	$(IVERILOG) -g2005 -I $(RTL_CORE) -I $(RTL_MEM) -I $(RTL_PERF) -I $(RTL_VICTIM) -I $(RTL_PREFETCH) -o $(SIM_SYSTEM) \
 		$(TB_DIR)/tb_system.v \
 		$(RTL_CORE)/pipeline.v $(RTL_CORE)/IF_ID.v $(RTL_CORE)/execute.v $(RTL_CORE)/muldiv.v $(RTL_CORE)/wb.v \
 		$(RTL_MEM)/memory.v $(RTL_MEM)/mem_subsystem.v $(RTL_MEM)/l1_cache_controller.v $(RTL_MEM)/main_memory.v \
-		$(RTL_VICTIM)/victim_cache.v $(RTL_PERF)/perf_profiler.v
+		$(RTL_VICTIM)/victim_cache.v $(RTL_PERF)/perf_profiler.v $(RTL_PREFETCH)/prefetcher.v
 	$(VVP) $(SIM_SYSTEM) +LATENCY=2 +CACHE_BYPASS=0 +MAXC=50000
 
 # Target: sim_top - Compile and run top-level Nexys A7 FPGA hardware testbench
 sim_top:
 	$(PYTHON) $(SCRIPTS)/build_workloads.py
-	cp sw/array_sum_imem.hex imem.hex
-	cp sw/array_sum_dmem.hex dmem.hex
-	cp sw/array_sum_mem128.hex mem128.hex
-	$(IVERILOG) -g2005 -I $(RTL_CORE) -I $(RTL_MEM) -I $(RTL_PERF) -I $(RTL_VICTIM) -I $(RTL_TOP) -o $(SIM_TOP) \
+	$(PYTHON) -c "import shutil; shutil.copy('sw/array_sum_imem.hex', 'imem.hex'); shutil.copy('sw/array_sum_dmem.hex', 'dmem.hex'); shutil.copy('sw/array_sum_mem128.hex', 'mem128.hex')"
+	$(IVERILOG) -g2005 -I $(RTL_CORE) -I $(RTL_MEM) -I $(RTL_PERF) -I $(RTL_VICTIM) -I $(RTL_TOP) -I $(RTL_PREFETCH) -o $(SIM_TOP) \
 		$(TB_DIR)/tb_top_fpga.v \
 		$(RTL_TOP)/top_fpga.v \
 		$(RTL_CORE)/pipeline.v $(RTL_CORE)/IF_ID.v $(RTL_CORE)/execute.v $(RTL_CORE)/muldiv.v $(RTL_CORE)/wb.v \
 		$(RTL_MEM)/memory.v $(RTL_MEM)/mem_subsystem.v $(RTL_MEM)/l1_cache_controller.v $(RTL_MEM)/main_memory.v \
-		$(RTL_VICTIM)/victim_cache.v $(RTL_PERF)/perf_profiler.v
+		$(RTL_VICTIM)/victim_cache.v $(RTL_PERF)/perf_profiler.v $(RTL_PREFETCH)/prefetcher.v
 	$(VVP) $(SIM_TOP)
+
+# Target: sim_prefetcher - Compile and run Stride Prefetcher unit testbench
+sim_prefetcher: $(RTL_PREFETCH)/prefetcher.v $(RTL_MEM)/main_memory.v $(TB_DIR)/tb_prefetcher.v
+	$(IVERILOG) -g2005 -Wall -o sim_prefetcher $(RTL_PREFETCH)/prefetcher.v $(RTL_MEM)/main_memory.v $(TB_DIR)/tb_prefetcher.v
+	$(VVP) sim_prefetcher
 
 # Target: test_benchmarks - Run complete benchmark suite across workloads and cache configurations
 test_benchmarks:
@@ -92,7 +94,7 @@ test_benchmarks:
 	$(PYTHON) $(SCRIPTS)/run_benchmarks.py
 
 # Target: test_all - Run all simulation suites
-test_all: sim_l1 sim_mem sim_md sim_cpu test_cpu sim_system sim_top test_benchmarks
+test_all: sim_l1 sim_mem sim_prefetcher sim_md sim_cpu test_cpu sim_system sim_top test_benchmarks
 
 # Target: report - Generate executive terminal verification & performance report
 report:

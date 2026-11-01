@@ -47,6 +47,7 @@ read_verilog [list \
     "$PROJ_DIR/rtl/mem/l1_cache_controller.v" \
     "$PROJ_DIR/rtl/victim/victim_cache.v" \
     "$PROJ_DIR/rtl/mem/mem_subsystem.v" \
+    "$PROJ_DIR/rtl/prefetch/prefetcher.v" \
     "$PROJ_DIR/rtl/perf/perf_profiler.v" \
     "$PROJ_DIR/rtl/top/top_fpga.v" \
 ]
@@ -55,6 +56,7 @@ set INC_DIRS [list \
     "$PROJ_DIR/rtl/core" \
     "$PROJ_DIR/rtl/mem" \
     "$PROJ_DIR/rtl/victim" \
+    "$PROJ_DIR/rtl/prefetch" \
     "$PROJ_DIR/rtl/perf" \
     "$PROJ_DIR/rtl/top" \
 ]
