@@ -178,7 +178,7 @@ module perf_profiler #(
     // and digits 3..0 display disp_val[15:0] (Profiler metric).
     // Otherwise, all 8 digits display the full 32-bit disp_val.
     wire [15:0] right_val_16 = disp_val[15:0];
-    wire [15:0] left_val_16  = (split_mode === 1'b1) ? left_val : disp_val[31:16];
+    wire [15:0] left_val_16  = (split_mode == 1'b1) ? left_val : disp_val[31:16];
 
     // Select active 4-bit nibble based on active digit
     reg [3:0] hex_digit;
@@ -197,7 +197,7 @@ module perf_profiler #(
     end
 
     // Active-low decimal point: illuminates on digit 4 in split mode as visual center separator
-    assign dp = (split_mode === 1'b1 && digit_sel == 3'd4) ? 1'b0 : 1'b1;
+    assign dp = (split_mode == 1'b1 && digit_sel == 3'd4) ? 1'b0 : 1'b1;
 
     // Active-low anode decoder: exactly one bit low at a time
     always @(*) begin

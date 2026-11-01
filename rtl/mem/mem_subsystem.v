@@ -32,6 +32,10 @@ module mem_subsystem #(
     input  wire [1:0]             latency_sel,   // SW[1:0]: N=1, 10, 100, 200 cycles
     input  wire                   cache_bypass,  // SW[2]: 0=L1 Cache, 1=Bypass directly to main memory
     input  wire                   victim_cache_en,// Switch/enable for victim cache (default 1)
+    input  wire                   prefetch_en,    // SW[8]: 1=Enable prefetcher, 0=Disabled
+    input  wire [ADDR_WIDTH-1:0]  load_pc,        // PC of the load instruction
+    input  wire                   is_load,        // Load instruction indicator
+    output wire                   prefetch_hit,   // Pulse to performance profiler
 
     // CPU Data Memory Interface (from pipeline.v)
     input  wire                   dmem_read_ready,
@@ -63,12 +67,19 @@ module mem_subsystem #(
     // ------------------------------------------------------------------------
     // Interconnect wires between L1 Cache Controller, Victim Cache, & Memory
     // ------------------------------------------------------------------------
-    wire                  mem_req;
-    wire                  mem_we;
-    wire [ADDR_WIDTH-1:0] mem_addr;
-    wire [127:0]          mem_wdata;
-    wire [127:0]          mem_rdata;
-    wire                  mem_ack;
+    wire                  l1_to_mem_req;
+    wire                  l1_to_mem_we;
+    wire [ADDR_WIDTH-1:0] l1_to_mem_addr;
+    wire [127:0]          l1_to_mem_wdata;
+    wire [127:0]          l1_to_mem_rdata;
+    wire                  l1_to_mem_ack;
+
+    wire                  main_mem_req;
+    wire                  main_mem_we;
+    wire [ADDR_WIDTH-1:0] main_mem_addr;
+    wire [127:0]          main_mem_wdata;
+    wire [127:0]          main_mem_rdata;
+    wire                  main_mem_ack;
 
     // Victim Cache Interconnect
     wire [ADDR_WIDTH-1:0] victim_lookup_addr;
@@ -175,12 +186,12 @@ module mem_subsystem #(
         .l1_hit              (l1_hit),
         .l1_miss             (l1_miss),
         .vc_hit_o            (vc_hit_o),
-        .mem_req             (mem_req),
-        .mem_we              (mem_we),
-        .mem_addr            (mem_addr),
-        .mem_wdata           (mem_wdata),
-        .mem_rdata           (mem_rdata),
-        .mem_ack             (mem_ack),
+        .mem_req             (l1_to_mem_req),
+        .mem_we              (l1_to_mem_we),
+        .mem_addr            (l1_to_mem_addr),
+        .mem_wdata           (l1_to_mem_wdata),
+        .mem_rdata           (l1_to_mem_rdata),
+        .mem_ack             (l1_to_mem_ack),
         .victim_lookup_addr  (victim_lookup_addr),
         .victim_hit          (victim_hit_effective),
         .victim_hit_data     (victim_hit_data),
@@ -220,7 +231,48 @@ module mem_subsystem #(
     );
 
     // ------------------------------------------------------------------------
-    // 3. Instantiate Configurable-Latency Main Memory Model
+    // 3. Instantiate 2-Delta Hardware Stride Prefetcher
+    // ------------------------------------------------------------------------
+    wire l1_is_idle   = !l1_cpu_stall && !l1_to_mem_req;
+    wire store_commit = dmem_write_ready && !l1_cpu_stall && !store_serviced;
+
+    wire prefetch_en_safe = (prefetch_en === 1'b1);
+
+    prefetcher #(
+        .ADDR_WIDTH (ADDR_WIDTH),
+        .DATA_WIDTH (128),
+        .PF_ENTRIES (1),
+        .RPT_ENTRIES(8)
+    ) prefetcher_inst (
+        .clk          (clk),
+        .rst          (rst),
+        .prefetch_en  (prefetch_en_safe),
+        .cache_bypass (cache_bypass),
+        .is_load      (is_load),
+        .load_pc      (load_pc),
+        .load_addr    (dmem_read_address),
+        .load_stall   (dmem_stall),
+        .store_valid  (store_commit),
+        .store_addr   (dmem_write_address),
+        .l1_idle      (l1_is_idle),
+        .l1_tag_hit   (1'b0),
+        .l1_mem_req   (l1_to_mem_req),
+        .l1_mem_we    (l1_to_mem_we),
+        .l1_mem_addr  (l1_to_mem_addr),
+        .l1_mem_wdata (l1_to_mem_wdata),
+        .l1_mem_rdata (l1_to_mem_rdata),
+        .l1_mem_ack   (l1_to_mem_ack),
+        .main_mem_req (main_mem_req),
+        .main_mem_we  (main_mem_we),
+        .main_mem_addr(main_mem_addr),
+        .main_mem_wdata(main_mem_wdata),
+        .main_mem_rdata(main_mem_rdata),
+        .main_mem_ack (main_mem_ack),
+        .prefetch_hit (prefetch_hit)
+    );
+
+    // ------------------------------------------------------------------------
+    // 4. Instantiate Configurable-Latency Main Memory Model
     // ------------------------------------------------------------------------
     main_memory #(
         .ADDR_WIDTH (ADDR_WIDTH),
@@ -232,12 +284,12 @@ module mem_subsystem #(
         .clk        (clk),
         .rst        (rst),
         .latency_sel(latency_sel),
-        .mem_req    (mem_req),
-        .mem_we     (mem_we),
-        .mem_addr   (mem_addr),
-        .mem_wdata  (mem_wdata),
-        .mem_rdata  (mem_rdata),
-        .mem_ack    (mem_ack)
+        .mem_req    (main_mem_req),
+        .mem_we     (main_mem_we),
+        .mem_addr   (main_mem_addr),
+        .mem_wdata  (main_mem_wdata),
+        .mem_rdata  (main_mem_rdata),
+        .mem_ack    (main_mem_ack)
     );
 
 endmodule

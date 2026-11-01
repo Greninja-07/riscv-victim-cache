@@ -151,6 +151,9 @@ module top_fpga #(
     wire vc_hit;
     wire mem_stall;
     wire frozen;
+    wire [31:0] dmem_load_pc;
+    wire        dmem_is_load;
+    wire        prefetch_hit;
 
     // Mailbox termination & result capture
     reg done = 1'b0;
@@ -230,7 +233,9 @@ module top_fpga #(
         .dmem_write_ready   (dmem_write_ready),
         .dmem_write_address (dmem_write_address),
         .dmem_write_data    (dmem_write_data),
-        .dmem_write_byte    (dmem_write_byte)
+        .dmem_write_byte    (dmem_write_byte),
+        .dmem_load_pc       (dmem_load_pc),
+        .dmem_is_load       (dmem_is_load)
     );
 
     // ------------------------------------------------------------------------
@@ -260,6 +265,10 @@ module top_fpga #(
         .latency_sel         (latency_sel),
         .cache_bypass        (cache_bypass),
         .victim_cache_en     (victim_cache_en),
+        .prefetch_en         (prefetch_en),
+        .load_pc             (dmem_load_pc),
+        .is_load             (dmem_is_load),
+        .prefetch_hit        (prefetch_hit),
         .dmem_read_ready     (dmem_read_ready),
         .dmem_read_address   (dmem_read_address),
         .dmem_write_ready    (dmem_write_ready),
@@ -297,7 +306,7 @@ module top_fpga #(
         .l1_hit      (l1_hit),
         .l1_miss     (l1_miss),
         .victim_hit  (vc_hit),
-        .prefetch_hit(1'b0),
+        .prefetch_hit(prefetch_hit),
         .sw          (prof_sw),
         .custom_val  (selected_op_result),
         .split_mode  (split_mode),
