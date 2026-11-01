@@ -28,6 +28,7 @@ module tb_system;
     reg [1:0] latency_sel;
     reg       cache_bypass;
     reg [2:0] prof_sw;
+    reg       prefetch_en;
 
     // CPU wires
     wire        exception;
@@ -41,6 +42,8 @@ module tb_system;
     wire [31:0] dmem_write_address;
     wire [31:0] dmem_write_data;
     wire [ 3:0] dmem_write_byte;
+    wire [31:0] dmem_load_pc;
+    wire        dmem_is_load;
 
     // Profiler wires
     wire l1_access;
@@ -48,6 +51,7 @@ module tb_system;
     wire l1_miss;
     wire vc_hit;
     wire mem_stall;
+    wire prefetch_hit;
     wire [6:0] seg;
     wire [7:0] an;
     wire       dp;
@@ -60,6 +64,7 @@ module tb_system;
     integer maxc;
     integer arg_bypass;
     integer arg_lat;
+    integer arg_pf;
 
     // 100 MHz clock
     always #5 clk = ~clk;
@@ -86,7 +91,9 @@ module tb_system;
         .dmem_write_ready   (dmem_write_ready),
         .dmem_write_address (dmem_write_address),
         .dmem_write_data    (dmem_write_data),
-        .dmem_write_byte    (dmem_write_byte)
+        .dmem_write_byte    (dmem_write_byte),
+        .dmem_load_pc       (dmem_load_pc),
+        .dmem_is_load       (dmem_is_load)
     );
 
     // ------------------------------------------------------------------------
@@ -116,6 +123,10 @@ module tb_system;
         .latency_sel         (latency_sel),
         .cache_bypass        (cache_bypass),
         .victim_cache_en     (1'b1),
+        .prefetch_en         (prefetch_en),
+        .load_pc             (dmem_load_pc),
+        .is_load             (dmem_is_load),
+        .prefetch_hit        (prefetch_hit),
         .dmem_read_ready     (dmem_read_ready),
         .dmem_read_address   (dmem_read_address),
         .dmem_write_ready    (dmem_write_ready),
@@ -152,8 +163,11 @@ module tb_system;
         .l1_hit      (l1_hit),
         .l1_miss     (l1_miss),
         .victim_hit  (vc_hit),
-        .prefetch_hit(1'b0),
+        .prefetch_hit(prefetch_hit),
         .sw          (prof_sw),
+        .custom_val  (32'h00000000),
+        .split_mode  (1'b0),
+        .left_val    (16'h0000),
         .seg         (seg),
         .an          (an),
         .dp          (dp),
@@ -181,6 +195,11 @@ module tb_system;
             latency_sel = arg_lat[1:0];
         else
             latency_sel = 2'b10; // Default N = 100
+
+        if ($value$plusargs("PREFETCH_EN=%d", arg_pf))
+            prefetch_en = (arg_pf != 0);
+        else
+            prefetch_en = 1'b0;
 
         #22;
         @(posedge clk);
@@ -223,6 +242,8 @@ module tb_system;
                 end
                 $display("  Cache Bypass     : %0d", cache_bypass);
                 $display("  Latency Setting  : %b", latency_sel);
+                $display("  Prefetch Hits    : %0d", profiler.prefetch_hits);
+                $display("  Prefetch En      : %0d", prefetch_en);
                 $display("==================================================================");
                 $finish;
             end

@@ -30,6 +30,10 @@ module tb_mem_subsystem;
     reg [1:0] latency_sel;
     reg       cache_bypass;
     reg       victim_cache_en;
+    reg       prefetch_en;
+    reg [ADDR_WIDTH-1:0] load_pc;
+    reg       is_load;
+    wire      prefetch_hit;
 
     // CPU Data Memory Interface
     reg                   dmem_read_ready;
@@ -75,6 +79,10 @@ module tb_mem_subsystem;
         .latency_sel         (latency_sel),
         .cache_bypass        (cache_bypass),
         .victim_cache_en     (victim_cache_en),
+        .prefetch_en         (prefetch_en),
+        .load_pc             (load_pc),
+        .is_load             (is_load),
+        .prefetch_hit        (prefetch_hit),
         .dmem_read_ready     (dmem_read_ready),
         .dmem_read_address   (dmem_read_address),
         .dmem_write_ready    (dmem_write_ready),
@@ -130,6 +138,42 @@ module tb_mem_subsystem;
                 pass_count = pass_count + 1;
             end else begin
                 $display("[FAIL] Load  Addr: 0x%08h | Got: 0x%08h | Expected: 0x%08h", addr, dmem_read_data, expected_data);
+                fail_count = fail_count + 1;
+            end
+        end
+    endtask
+
+    
+    task cpu_load_pc;
+        input [ADDR_WIDTH-1:0] pc_val;
+        input [ADDR_WIDTH-1:0] addr;
+        input [DATA_WIDTH-1:0] expected_data;
+        reg [31:0] stall_cycles;
+        begin
+            @(posedge clk);
+            dmem_read_ready   <= 1'b1;
+            dmem_read_address <= addr;
+            load_pc           <= pc_val;
+            is_load           <= 1'b1;
+            stall_cycles = 0;
+
+            #1;
+            while (dmem_stall) begin
+                stall_cycles = stall_cycles + 1;
+                @(posedge clk);
+                #1;
+            end
+
+            @(posedge clk);
+            dmem_read_ready <= 1'b0;
+            is_load         <= 1'b0;
+
+            #1;
+            if (dmem_read_data === expected_data) begin
+                $display("[PASS] Load PC: 0x%08h | Addr: 0x%08h | Data: 0x%08h | Stalls: %0d", pc_val, addr, dmem_read_data, stall_cycles);
+                pass_count = pass_count + 1;
+            end else begin
+                $display("[FAIL] Load PC: 0x%08h | Addr: 0x%08h | Got: 0x%08h | Expected: 0x%08h", pc_val, addr, dmem_read_data, expected_data);
                 fail_count = fail_count + 1;
             end
         end
@@ -263,6 +307,34 @@ module tb_mem_subsystem;
         cache_bypass = 1'b0;
         $display("[SWITCH] cache_bypass = 1'b0 (Cache Re-enabled)");
 
+        
+        // --- TEST 7: Full Hierarchy Lookup Order (L1 -> VC -> PF Buffer -> Memory) ---
+        $display("\n--- TEST 7: Complete Hierarchy Lookup Order Verification ---");
+        $display("[STEP 1] Testing 0-Stall L1 Hit...");
+        cpu_load(32'h0000_0000, 32'h9988_7766); // L1 Hit -> 0 stalls
+
+        $display("[STEP 2] Testing 2-Cycle Victim Cache Swap on Conflict Miss...");
+        // Read 0x0800 to evict 0x0000 to Victim Cache
+        cpu_load(32'h0000_0800, 32'h4444_0800); // Evicts 0x0000 dirty line to VC
+        // Now read 0x0000 again -> hits in Victim Cache (2 stalls)
+        cpu_load(32'h0000_0000, 32'h9988_7766); // VC Swap hit!
+
+        $display("[STEP 3] Enabling Stride Prefetcher (SW[8] = 1) and Training Stride +16B...");
+        prefetch_en = 1'b1;
+        latency_sel = 2'b01; // N = 10
+        // Access 0x0200, 0x0210, 0x0220 with PC=0x1000
+        // Stride training: 0x200 (init), 0x210 (learn +16), 0x220 (transient), 0x230 (steady -> prefetches 0x240!)
+        cpu_load_pc(32'h0000_1000, 32'h0000_0200, 32'h4444_0200);
+        cpu_load_pc(32'h0000_1000, 32'h0000_0210, 32'h4444_0210);
+        cpu_load_pc(32'h0000_1000, 32'h0000_0220, 32'h4444_0220);
+        cpu_load_pc(32'h0000_1000, 32'h0000_0230, 32'h4444_0230); // Reaches STEADY, triggers prefetch of 0x0240!
+
+        // Wait for speculative prefetch of 0x0240 to complete into prefetch buffer
+        #250;
+
+        $display("[STEP 4] Testing Fast Prefetch Buffer Hit (<= 2 stall cycles vs 12 DRAM cycles)...");
+        // Read 0x0240 -> misses in L1 and VC, HITS in Prefetch Buffer!
+        cpu_load_pc(32'h0000_1000, 32'h0000_0240, 32'h4444_0240);
         // --- TEST 6: Latency Switch Scaling ---
         $display("\n--- TEST 6: Dynamic Latency Switch Scaling (N=1, 10, 100, 200) ---");
         latency_sel = 2'b00; // N = 1
