@@ -28,7 +28,11 @@ module pipe #(
     output wire             dmem_write_ready,
     output wire [31: 0]     dmem_write_address,
     output wire [31: 0]     dmem_write_data,
-    output wire [ 3: 0]     dmem_write_byte
+    output wire [ 3: 0]     dmem_write_byte,
+
+    // Stride Prefetcher training snoop ports
+    output wire [31: 0]     dmem_load_pc,
+    output wire             dmem_is_load
 );
     
     //Declaring Wires and Registers
@@ -111,6 +115,8 @@ assign dmem_write_data          = wb_write_data;    // assigning data to write
 assign dmem_write_byte          = wb_write_byte;    // flag for writing the data bytes
 assign dmem_read_data           = dmem_read_data_temp;      // data read from the memory
 assign dmem_read_valid_checker  = 1'b1;
+assign dmem_load_pc             = mem_to_reg ? pc : 32'd0;
+assign dmem_is_load             = mem_to_reg;
 // -----------------------------------------------------//
 
 // instantiating Instruction fetch module -----------------------
