@@ -506,8 +506,100 @@ def build_complex_ops():
     write_hex_files("complex_ops", instrs, dmem)
     return expected_total
 
-    write_hex_files("complex_ops", instrs, dmem)
-    return expected_total
+
+def build_stride_sum():
+    """
+    Workload 6: Stride Sum (Locality / Prefetcher Evaluation)
+    Traverses an array with constant stride S = 4 words (16 bytes = 1 cache line)
+    over 160 elements (2560 bytes > 2 KB L1 Cache).
+    Every access touches a completely new cache line.
+    Without prefetcher: 160 compulsory misses.
+    With prefetcher: trains after first few accesses, then hits prefetch buffer!
+    """
+    ARRAY_BASE = 0x0800  # 2048 bytes
+    NUM_ELEMS  = 160     # 160 * 16 B = 2560 B (> 2KB L1 cache)
+
+    instrs = []
+    instrs.extend(asm.li(2, ARRAY_BASE)) # x2: array pointer
+    instrs.extend(asm.li(3, NUM_ELEMS))  # x3: element counter
+    instrs.extend(asm.li(10, 0))         # x10: accumulator sum
+
+    loop_start = len(instrs) * 4
+    instrs.append(asm.lw(4, 2, 0))       # lw x4, 0(x2)
+    instrs.append(asm.add(10, 10, 4))    # add x10, x10, x4
+    instrs.append(asm.addi(2, 2, 16))    # addi x2, x2, 16 (stride = +16B)
+    instrs.append(asm.addi(3, 3, -1))    # addi x3, x3, -1
+    offset = loop_start - (len(instrs) * 4)
+    instrs.append(asm.b(1, 3, 0, offset))# bne x3, x0, loop_start
+
+    # Mailbox completion
+    instrs.extend(asm.li(5, 0x1FC))
+    instrs.append(asm.sw(10, 5, 0))
+    instrs.extend(asm.li(6, 0x1F8))
+    instrs.extend(asm.li(7, 1))
+    instrs.append(asm.sw(7, 6, 0))
+    instrs.append(asm.j(0, 0))
+
+    dmem = [0] * NUM_WORDS
+    expected_sum = 0
+    for i in range(NUM_ELEMS):
+        val = (i + 1) * 7
+        dmem[(ARRAY_BASE // 4) + (i * 4)] = val
+        expected_sum = (expected_sum + val) & 0xffffffff
+
+    write_hex_files("stride_sum", instrs, dmem)
+    return expected_sum
+
+
+def build_stride_mixed():
+    """
+    Workload 7: Stride Mixed (Dual Strided Stream + RV32M MUL)
+    Interleaved loads from two arrays with different strides:
+    - Array A: Stride +16 B (4 words)
+    - Array B: Stride +32 B (8 words)
+    - Multiplies A[i] * B[i] and accumulates into x10 for 64 iterations.
+    Tests multi-stream RPT tracking and RV32M pipeline throughput.
+    """
+    ADDR_A = 0x0400  # 1024 bytes (spans 64 * 16 = 1024 B, ends at 0x0800)
+    ADDR_B = 0x0C00  # 3072 bytes (spans 64 * 32 = 2048 B, ends at 0x1400)
+    LEN    = 64
+
+    instrs = []
+    instrs.extend(asm.li(1, ADDR_A))     # x1: ptr A
+    instrs.extend(asm.li(2, ADDR_B))     # x2: ptr B
+    instrs.extend(asm.li(3, LEN))        # x3: count
+    instrs.extend(asm.li(10, 0))         # x10: accumulator
+
+    loop_start = len(instrs) * 4
+    instrs.append(asm.lw(4, 1, 0))       # lw x4, 0(x1) (PC1: trains RPT for Stream A)
+    instrs.append(asm.lw(5, 2, 0))       # lw x5, 0(x2) (PC2: trains RPT for Stream B)
+    instrs.append(asm.m('mul', 6, 4, 5)) # mul x6, x4, x5
+    instrs.append(asm.add(10, 10, 6))    # add x10, x10, x6
+    instrs.append(asm.addi(1, 1, 16))    # addi x1, x1, 16 (stride +16 B)
+    instrs.append(asm.addi(2, 2, 32))    # addi x2, x2, 32 (stride +32 B)
+    instrs.append(asm.addi(3, 3, -1))    # addi x3, x3, -1
+    offset = loop_start - (len(instrs) * 4)
+    instrs.append(asm.b(1, 3, 0, offset))# bne x3, x0, loop_start
+
+    # Mailbox completion
+    instrs.extend(asm.li(5, 0x1FC))
+    instrs.append(asm.sw(10, 5, 0))
+    instrs.extend(asm.li(6, 0x1F8))
+    instrs.extend(asm.li(7, 1))
+    instrs.append(asm.sw(7, 6, 0))
+    instrs.append(asm.j(0, 0))
+
+    dmem = [0] * NUM_WORDS
+    expected_sum = 0
+    for i in range(LEN):
+        val_a = (i + 1) * 3
+        val_b = (i + 2) * 5
+        dmem[(ADDR_A // 4) + (i * 4)] = val_a
+        dmem[(ADDR_B // 4) + (i * 8)] = val_b
+        expected_sum = (expected_sum + (val_a * val_b)) & 0xffffffff
+
+    write_hex_files("stride_mixed", instrs, dmem)
+    return expected_sum
 
 
 if __name__ == "__main__":
@@ -517,5 +609,7 @@ if __name__ == "__main__":
     s3 = build_conflict_thrash()
     s4 = build_rw_persistence()
     s5 = build_complex_ops()
+    s6 = build_stride_sum()
+    s7 = build_stride_mixed()
     print("All workloads built successfully!")
-    print(f"Golden results: array_sum={s1}, vector_dot={s2}, conflict={s3}, rw={s4}, complex_ops={s5}")
+    print(f"Golden results: array_sum={s1}, vector_dot={s2}, conflict={s3}, rw={s4}, complex_ops={s5}, stride_sum={s6}, stride_mixed={s7}")
