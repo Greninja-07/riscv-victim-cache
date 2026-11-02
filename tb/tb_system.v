@@ -3,7 +3,7 @@
 // ============================================================================
 // Testbench: tb_system
 // Project: RV32I Memory Hierarchy Enhancement with Victim Cache & Prefetcher
-// Author: Abhishek Kumar (Group 14)
+
 //
 // Description:
 //   Full-System End-to-End Simulation Testbench:
