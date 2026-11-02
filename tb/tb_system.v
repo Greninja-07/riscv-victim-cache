@@ -187,6 +187,11 @@ module tb_system;
         result_val   = 0;
         prof_sw      = 3'b000;
 
+        if ($value$plusargs("VC_EN=%d", arg_vc))
+         vc_en = (arg_vc != 0);
+     else
+         vc_en = 1'b1;
+
         if (!$value$plusargs("MAXC=%d", maxc)) maxc = 50000;
         if ($value$plusargs("CACHE_BYPASS=%d", arg_bypass))
             cache_bypass = (arg_bypass != 0);
@@ -244,6 +249,8 @@ module tb_system;
                 end
                 $display("  Cache Bypass     : %0d", cache_bypass);
                 $display("  Latency Setting  : %b", latency_sel);
+                $display("  Victim Hits      : %0d", profiler.victim_hits);
+                $display("  Victim Cache En  : %0d", vc_en);
                 $display("  Prefetch Hits    : %0d", profiler.prefetch_hits);
                 $display("  Prefetch En      : %0d", prefetch_en);
                 $display("==================================================================");
