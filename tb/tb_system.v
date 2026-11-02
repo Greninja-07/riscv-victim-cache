@@ -27,6 +27,7 @@ module tb_system;
     // Runtime switches
     reg [1:0] latency_sel;
     reg       cache_bypass;
+    reg       vc_en;
     reg [2:0] prof_sw;
     reg       prefetch_en;
 
@@ -63,6 +64,7 @@ module tb_system;
     integer cyc;
     integer maxc;
     integer arg_bypass;
+    integer arg_vc;
     integer arg_lat;
     integer arg_pf;
 
@@ -122,7 +124,7 @@ module tb_system;
         .rst                 (~rst_n),
         .latency_sel         (latency_sel),
         .cache_bypass        (cache_bypass),
-        .victim_cache_en     (1'b1),
+        .victim_cache_en     (vc_en),
         .prefetch_en         (prefetch_en),
         .load_pc             (dmem_load_pc),
         .is_load             (dmem_is_load),
