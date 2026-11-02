@@ -19,8 +19,7 @@ if hasattr(sys.stdout, 'reconfigure'):
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SW_DIR   = os.path.join(ROOT_DIR, "sw")
-TB_DIR   = os.path.join(ROOT_DIR, "tb")
-RTL_DIR  = os.path.join(ROOT_DIR, "rtl")
+
 
 SIM_BIN  = os.path.join(ROOT_DIR, "sim_system")
 
