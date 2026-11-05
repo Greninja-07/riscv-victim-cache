@@ -6,24 +6,26 @@
 // Author: Archit & Team (Group 14)
 //
 // Description:
-//   Hardware Stride Data Prefetcher with:
+//   Hardware Multi-Degree Stride Data Prefetcher with:
 //   - 8-entry Reference Prediction Table (RPT) indexed by PC[4:2]
 //   - 2-bit saturating confidence counter (INIT, TRANSIENT, STEADY, NO_PRED)
-//   - Parameterizable 1-entry Prefetch Buffer (pf_valid, pf_tag[31:4], pf_data[127:0])
+//   - 4-entry Fully-Associative Prefetch Buffer (PF_ENTRIES = 4, default)
+//   - Multi-Degree Speculative Prefetching (PREFETCH_DEGREE = 2, default)
 //   - Lowest priority memory arbitration to main_memory
 //   - Bounded wait (<= N cycles) and same-line merge on demand miss during in-flight prefetch
 //   - Fast prefetch buffer hit path (<= 2 stall cycles to CPU)
-//   - Store coherence invalidation on store hits
+//   - Store coherence invalidation across all buffer entries, pending queue, and in-flight lines
 //   - Fully disabled and held in reset when SW[8] (prefetch_en) = 0
 //   - Idle during cache bypass (SW[2] = 1)
 //   - Synchronous reset, no latches, Verilog-2001 synthesizable
 // ============================================================================
 
 module prefetcher #(
-    parameter ADDR_WIDTH  = 32,
-    parameter DATA_WIDTH  = 128,
-    parameter PF_ENTRIES  = 1,
-    parameter RPT_ENTRIES = 8
+    parameter ADDR_WIDTH      = 32,
+    parameter DATA_WIDTH      = 128,
+    parameter PF_ENTRIES      = 4,
+    parameter RPT_ENTRIES     = 8,
+    parameter PREFETCH_DEGREE = 2
 )(
     input  wire                  clk,
     input  wire                  rst,
@@ -67,6 +69,11 @@ module prefetcher #(
 );
 
     // ------------------------------------------------------------------------
+    // Buffer Pointer Width Definition
+    // ------------------------------------------------------------------------
+    localparam PTR_WIDTH = (PF_ENTRIES > 1) ? $clog2(PF_ENTRIES) : 1;
+
+    // ------------------------------------------------------------------------
     // Confidence States
     // ------------------------------------------------------------------------
     localparam CONF_INIT      = 2'd0;
@@ -104,57 +111,144 @@ module prefetcher #(
     wire train_fire = is_load && !load_stall && (prefetch_en == 1'b1) && !cache_bypass;
 
     // ------------------------------------------------------------------------
-    // 2. Prefetch Buffer: 1 entry (PF_ENTRIES = 1)
+    // 2. Multi-Entry Prefetch Buffer
     // ------------------------------------------------------------------------
-    reg                  pf_valid;
-    reg [ADDR_WIDTH-5:0] pf_tag;        // addr[31:4] (28 bits)
-    reg [DATA_WIDTH-1:0] pf_data;
+    reg                  pf_buf_valid [0:PF_ENTRIES-1];
+    reg [ADDR_WIDTH-5:0] pf_buf_tag   [0:PF_ENTRIES-1];
+    reg [DATA_WIDTH-1:0] pf_buf_data  [0:PF_ENTRIES-1];
+    reg [PTR_WIDTH-1:0]  pf_wr_ptr;
 
     // In-flight tracking registers
     reg                  inflight;
     reg [ADDR_WIDTH-5:0] inflight_tag;
     reg                  inflight_invalid;
 
-    // Pending prefetch register
+    // Multi-candidate pending queue (degree 1 & 2)
     reg                  pending_valid;
     reg [ADDR_WIDTH-1:0] pending_addr;
+    reg                  pending_valid2;
+    reg [ADDR_WIDTH-1:0] pending_addr2;
 
     // Delayed hit pulse for profiler
     reg                  pf_hit_pulse;
 
-    // Check prefetch buffer hit on incoming L1 demand miss
-    wire l1_hit_pf_buf = pf_valid && (pf_tag == l1_mem_addr[ADDR_WIDTH-1:4]) && !l1_mem_we && (prefetch_en == 1'b1) && !cache_bypass;
+    // Associative match for L1 demand miss hits
+    wire [PF_ENTRIES-1:0] pf_buf_valid_vec;
+    wire [PF_ENTRIES-1:0] l1_buf_hit_vec;
+    genvar gv;
+    generate
+        for (gv = 0; gv < PF_ENTRIES; gv = gv + 1) begin: b_match_gen
+            assign pf_buf_valid_vec[gv] = pf_buf_valid[gv];
+            assign l1_buf_hit_vec[gv]   = pf_buf_valid[gv] && (pf_buf_tag[gv] == l1_mem_addr[ADDR_WIDTH-1:4]);
+        end
+    endgenerate
+
+    wire l1_hit_pf_buf = (|l1_buf_hit_vec) && !l1_mem_we && (prefetch_en == 1'b1) && !cache_bypass;
+
+    reg [PTR_WIDTH-1:0]  hit_idx;
+    reg [DATA_WIDTH-1:0] pf_data_mux;
+    integer h_i;
+    always @(*) begin
+        hit_idx     = {PTR_WIDTH{1'b0}};
+        pf_data_mux = pf_buf_data[0];
+        for (h_i = 0; h_i < PF_ENTRIES; h_i = h_i + 1) begin
+            if (l1_buf_hit_vec[h_i]) begin
+                hit_idx     = h_i[PTR_WIDTH-1:0];
+                pf_data_mux = pf_buf_data[h_i];
+            end
+        end
+    end
+
+    // Backward-compatibility signals for testbenches and probes
+    wire                  pf_valid = |pf_buf_valid_vec;
+    reg [ADDR_WIDTH-5:0]  pf_tag_mux;
+    integer pt_i;
+    always @(*) begin
+        pf_tag_mux = pf_buf_tag[0];
+        for (pt_i = 0; pt_i < PF_ENTRIES; pt_i = pt_i + 1) begin
+            if (pf_buf_valid[pt_i]) begin
+                pf_tag_mux = pf_buf_tag[pt_i];
+            end
+        end
+    end
+    wire [ADDR_WIDTH-5:0] pf_tag  = pf_buf_valid[0] ? pf_buf_tag[0] : pf_tag_mux;
+    wire [DATA_WIDTH-1:0] pf_data = pf_data_mux;
 
     // ------------------------------------------------------------------------
     // Prediction Logic (Combinational evaluation at training time)
     // ------------------------------------------------------------------------
     wire [ADDR_WIDTH-1:0] stride_ext = {{16{rpt_stride[train_idx][15]}}, rpt_stride[train_idx]};
-    wire [ADDR_WIDTH-1:0] cand_target_addr = load_addr + stride_ext;
-    wire [ADDR_WIDTH-1:0] cand_line_addr   = {cand_target_addr[ADDR_WIDTH-1:4], 4'b0000};
-    wire target_in_range = (cand_line_addr < 32'd16384);
+    wire [ADDR_WIDTH-1:0] cand1_target_addr = load_addr + stride_ext;
+    wire [ADDR_WIDTH-1:0] cand1_line_addr   = {cand1_target_addr[ADDR_WIDTH-1:4], 4'b0000};
+    wire target1_in_range = (cand1_line_addr < 32'd16384);
 
-    reg cand_valid;
+    wire [ADDR_WIDTH-1:0] stride_x2 = {stride_ext[ADDR_WIDTH-2:0], 1'b0};
+    wire [ADDR_WIDTH-1:0] cand2_target_addr = load_addr + stride_x2;
+    wire [ADDR_WIDTH-1:0] cand2_line_addr   = {cand2_target_addr[ADDR_WIDTH-1:4], 4'b0000};
+    wire target2_in_range = (cand2_line_addr < 32'd16384);
+
+    wire [PF_ENTRIES-1:0] cand1_buf_match;
+    wire [PF_ENTRIES-1:0] cand2_buf_match;
+    generate
+        for (gv = 0; gv < PF_ENTRIES; gv = gv + 1) begin: cand_match_gen
+            assign cand1_buf_match[gv] = pf_buf_valid[gv] && (pf_buf_tag[gv] == cand1_line_addr[ADDR_WIDTH-1:4]);
+            assign cand2_buf_match[gv] = pf_buf_valid[gv] && (pf_buf_tag[gv] == cand2_line_addr[ADDR_WIDTH-1:4]);
+        end
+    endgenerate
+    wire cand1_in_buf = |cand1_buf_match;
+    wire cand2_in_buf = |cand2_buf_match;
+
+    wire cand1_inflight = inflight && (inflight_tag == cand1_line_addr[ADDR_WIDTH-1:4]);
+    wire cand2_inflight = inflight && (inflight_tag == cand2_line_addr[ADDR_WIDTH-1:4]);
+
+    reg cand1_valid;
+    reg cand2_valid;
+
     always @(*) begin
-        cand_valid = 1'b0;
+        cand1_valid = 1'b0;
+        cand2_valid = 1'b0;
 
-        if (train_fire && target_in_range) begin
+        if (train_fire) begin
             // Check if entry is STEADY or will become STEADY on this access
             if (rpt_valid[train_idx] && (rpt_pc_tag[train_idx] == train_tag)) begin
                 if ((rpt_conf[train_idx] == CONF_STEADY) ||
                     (rpt_conf[train_idx] == CONF_TRANSIENT && (new_stride == rpt_stride[train_idx]) && (new_stride != 16'sd0))) begin
                     
-                    // Filter conditions:
-                    // 1. Target line != current line
-                    // 2. Target line not already in L1 (l1_tag_hit == 0)
-                    // 3. Target line not in prefetch buffer
-                    // 4. Target line not currently in-flight
-                    if ((cand_line_addr[ADDR_WIDTH-1:4] != load_addr[ADDR_WIDTH-1:4]) &&
+                    // Filter conditions for Candidate 1 (+1 Stride):
+                    if (target1_in_range &&
+                        (cand1_line_addr[ADDR_WIDTH-1:4] != load_addr[ADDR_WIDTH-1:4]) &&
                         !l1_tag_hit &&
-                        !(pf_valid && (pf_tag == cand_line_addr[ADDR_WIDTH-1:4])) &&
-                        !(inflight && (inflight_tag == cand_line_addr[ADDR_WIDTH-1:4]))) begin
-                        cand_valid = 1'b1;
+                        !cand1_in_buf &&
+                        !cand1_inflight) begin
+                        cand1_valid = 1'b1;
+                    end
+
+                    // Filter conditions for Candidate 2 (+2 Strides):
+                    if ((PREFETCH_DEGREE >= 2) &&
+                        target2_in_range &&
+                        (cand2_line_addr[ADDR_WIDTH-1:4] != load_addr[ADDR_WIDTH-1:4]) &&
+                        (cand2_line_addr[ADDR_WIDTH-1:4] != cand1_line_addr[ADDR_WIDTH-1:4]) &&
+                        !l1_tag_hit &&
+                        !cand2_in_buf &&
+                        !cand2_inflight) begin
+                        cand2_valid = 1'b1;
                     end
                 end
+            end
+        end
+    end
+
+    // Find next write slot: prefer invalid entry, else use round-robin pf_wr_ptr
+    reg [PTR_WIDTH-1:0] alloc_slot;
+    integer as_i;
+    reg slot_found;
+    always @(*) begin
+        alloc_slot = pf_wr_ptr;
+        slot_found = 1'b0;
+        for (as_i = 0; as_i < PF_ENTRIES; as_i = as_i + 1) begin
+            if (!pf_buf_valid[as_i] && !slot_found) begin
+                alloc_slot = as_i[PTR_WIDTH-1:0];
+                slot_found = 1'b1;
             end
         end
     end
@@ -166,15 +260,21 @@ module prefetcher #(
     always @(posedge clk) begin
         if (rst || (prefetch_en != 1'b1)) begin
             state            <= S_IDLE;
-            pf_valid         <= 1'b0;
-            pf_tag           <= 28'd0;
-            pf_data          <= {DATA_WIDTH{1'b0}};
             inflight         <= 1'b0;
-            inflight_tag     <= 28'd0;
+            inflight_tag     <= {ADDR_WIDTH-4{1'b0}};
             inflight_invalid <= 1'b0;
             pending_valid    <= 1'b0;
             pending_addr     <= {ADDR_WIDTH{1'b0}};
+            pending_valid2   <= 1'b0;
+            pending_addr2    <= {ADDR_WIDTH{1'b0}};
             pf_hit_pulse     <= 1'b0;
+            pf_wr_ptr        <= {PTR_WIDTH{1'b0}};
+
+            for (i = 0; i < PF_ENTRIES; i = i + 1) begin
+                pf_buf_valid[i] <= 1'b0;
+                pf_buf_tag[i]   <= {ADDR_WIDTH-4{1'b0}};
+                pf_buf_data[i]  <= {DATA_WIDTH{1'b0}};
+            end
 
             for (i = 0; i < RPT_ENTRIES; i = i + 1) begin
                 rpt_valid[i]     <= 1'b0;
@@ -187,6 +287,7 @@ module prefetcher #(
             // Prefetcher idle during cache bypass mode
             state            <= S_IDLE;
             pending_valid    <= 1'b0;
+            pending_valid2   <= 1'b0;
             pf_hit_pulse     <= 1'b0;
         end else begin
             pf_hit_pulse <= 1'b0;
@@ -221,20 +322,32 @@ module prefetcher #(
             end
 
             // ----------------------------------------------------------------
-            // 2. Pending Prefetch Registration
+            // 2. Pending Prefetch Registration (Degree 1 & 2 Enqueue)
             // ----------------------------------------------------------------
-            if (cand_valid) begin
-                pending_valid <= 1'b1;
-                pending_addr  <= cand_line_addr;
+            if (cand1_valid && cand2_valid) begin
+                pending_valid  <= 1'b1;
+                pending_addr   <= cand1_line_addr;
+                pending_valid2 <= 1'b1;
+                pending_addr2  <= cand2_line_addr;
+            end else if (cand1_valid) begin
+                pending_valid  <= 1'b1;
+                pending_addr   <= cand1_line_addr;
+                pending_valid2 <= 1'b0;
+            end else if (cand2_valid) begin
+                pending_valid  <= 1'b1;
+                pending_addr   <= cand2_line_addr;
+                pending_valid2 <= 1'b0;
             end
 
             // ----------------------------------------------------------------
             // 3. Store Coherence Invalidation
             // ----------------------------------------------------------------
             if (store_valid) begin
-                // Invalidate prefetch buffer if store address hits buffered line
-                if (pf_valid && (pf_tag == store_addr[ADDR_WIDTH-1:4])) begin
-                    pf_valid <= 1'b0;
+                // Invalidate prefetch buffer entries matching store address
+                for (i = 0; i < PF_ENTRIES; i = i + 1) begin
+                    if (pf_buf_valid[i] && (pf_buf_tag[i] == store_addr[ADDR_WIDTH-1:4])) begin
+                        pf_buf_valid[i] <= 1'b0;
+                    end
                 end
                 // If in-flight prefetch target matches store address, invalidate on arrival
                 if (inflight && (inflight_tag == store_addr[ADDR_WIDTH-1:4])) begin
@@ -244,14 +357,17 @@ module prefetcher #(
                 if (pending_valid && (pending_addr[ADDR_WIDTH-1:4] == store_addr[ADDR_WIDTH-1:4])) begin
                     pending_valid <= 1'b0;
                 end
+                if (pending_valid2 && (pending_addr2[ADDR_WIDTH-1:4] == store_addr[ADDR_WIDTH-1:4])) begin
+                    pending_valid2 <= 1'b0;
+                end
             end
 
             // ----------------------------------------------------------------
             // 4. Prefetch Buffer Consumption (on L1 Demand Hit)
             // ----------------------------------------------------------------
             if (l1_mem_req && l1_hit_pf_buf) begin
-                pf_valid     <= 1'b0; // Line transferred to L1
-                pf_hit_pulse <= 1'b1; // Strobe perf profiler
+                pf_buf_valid[hit_idx] <= 1'b0; // Line transferred to L1
+                pf_hit_pulse          <= 1'b1; // Strobe perf profiler
             end
 
             // ----------------------------------------------------------------
@@ -265,7 +381,10 @@ module prefetcher #(
                         inflight         <= 1'b1;
                         inflight_tag     <= pending_addr[ADDR_WIDTH-1:4];
                         inflight_invalid <= 1'b0;
-                        pending_valid    <= 1'b0;
+                        // Shift pending queue
+                        pending_valid    <= pending_valid2;
+                        pending_addr     <= pending_addr2;
+                        pending_valid2   <= 1'b0;
                     end
                 end
 
@@ -277,12 +396,12 @@ module prefetcher #(
                         // Check if demand miss was waiting for this exact line (merge hit!)
                         if (l1_mem_req && (l1_mem_addr[ADDR_WIDTH-1:4] == inflight_tag) && !l1_mem_we) begin
                             pf_hit_pulse <= 1'b1;
-                            pf_valid     <= 1'b0;
                         end else if (!inflight_invalid) begin
                             // Otherwise, store into prefetch buffer
-                            pf_valid <= 1'b1;
-                            pf_tag   <= inflight_tag;
-                            pf_data  <= main_mem_rdata;
+                            pf_buf_valid[alloc_slot] <= 1'b1;
+                            pf_buf_tag[alloc_slot]   <= inflight_tag;
+                            pf_buf_data[alloc_slot]  <= main_mem_rdata;
+                            pf_wr_ptr                <= (pf_wr_ptr == PF_ENTRIES - 1) ? {PTR_WIDTH{1'b0}} : (pf_wr_ptr + 1'b1);
                         end
                     end
                 end
@@ -292,7 +411,6 @@ module prefetcher #(
         end
     end
 
-    // ------------------------------------------------------------------------
     // ------------------------------------------------------------------------
     // Combinational Output Multiplexing (Decoupled, zero-loop continuous assignments)
     // ------------------------------------------------------------------------

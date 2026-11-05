@@ -84,8 +84,9 @@ module tb_prefetcher;
     prefetcher #(
         .ADDR_WIDTH (ADDR_WIDTH),
         .DATA_WIDTH (DATA_WIDTH),
-        .PF_ENTRIES (1),
-        .RPT_ENTRIES(8)
+        .PF_ENTRIES      (4),
+        .RPT_ENTRIES     (8),
+        .PREFETCH_DEGREE (2)
     ) dut (
         .clk          (clk),
         .rst          (rst),

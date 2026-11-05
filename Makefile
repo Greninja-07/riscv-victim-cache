@@ -6,7 +6,15 @@ IVERILOG   ?= iverilog
 VVP        ?= vvp
 # Use python3 if available, otherwise fallback to python (e.g. Windows)
 PYTHON     ?= $(shell command -v python3 2>/dev/null || echo python)
-VIVADO     ?= vivado
+# Auto-detect Vivado on Windows if not already in PATH
+ifeq ($(OS),Windows_NT)
+  VIVADO ?= $(shell where vivado 2>nul || (if exist "D:\AMDDesignTools\2025.2\Vivado\bin\vivado.bat" echo D:/AMDDesignTools/2025.2/Vivado/bin/vivado.bat))
+  ifeq ($(strip $(VIVADO)),)
+    VIVADO = vivado
+  endif
+else
+  VIVADO ?= vivado
+endif
 TCL_SCRIPT  = scripts/vivado_bitstream.tcl
 
 # Directories

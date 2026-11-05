@@ -241,8 +241,9 @@ module mem_subsystem #(
     prefetcher #(
         .ADDR_WIDTH (ADDR_WIDTH),
         .DATA_WIDTH (128),
-        .PF_ENTRIES (1),
-        .RPT_ENTRIES(8)
+        .PF_ENTRIES      (4),
+        .RPT_ENTRIES     (8),
+        .PREFETCH_DEGREE (2)
     ) prefetcher_inst (
         .clk          (clk),
         .rst          (rst),

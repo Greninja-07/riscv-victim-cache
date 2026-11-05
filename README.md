@@ -137,7 +137,8 @@ A speculative hardware prefetcher that detects constant-stride load patterns and
 | PC tag bits | 10 (`load_pc[14:5]`) |
 | Stride register | 16-bit signed |
 | Confidence FSM | 2-bit saturating: INIT → TRANSIENT → STEADY → NO_PRED |
-| Prefetch buffer | 1 entry (parameterised), 128-bit line + 28-bit tag + valid |
+| Prefetch buffer | 4 entries (fully-associative FIFO), 128-bit line + 28-bit tag + valid |
+| Prefetch degree | 2 lines (+1 and +2 strides ahead) |
 | Enable | `SW[8]` — when 0, tables held in reset, bus is transparent pass-through |
 
 #### Hierarchy Lookup Order
@@ -160,7 +161,7 @@ CPU load → L1 cache (0 stalls) → Victim cache (2 stalls)
 #### Module Port Reference
 
 ```
-prefetcher #(ADDR_WIDTH=32, DATA_WIDTH=128, PF_ENTRIES=1, RPT_ENTRIES=8)
+prefetcher #(ADDR_WIDTH=32, DATA_WIDTH=128, PF_ENTRIES=4, RPT_ENTRIES=8, PREFETCH_DEGREE=2)
 
   Control
     clk, rst
