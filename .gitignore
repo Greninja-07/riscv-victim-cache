@@ -43,3 +43,12 @@ reports/
 # Scratch directory
 scratch/
 top_fpga.bit
+
+# Generated documentation visuals & archives
+docs/*.png
+docs/*.svg
+docs/*.html
+docs/*.pdf
+docs/prefetcher_detailed/
+*.zip
+dashboard/media_*
