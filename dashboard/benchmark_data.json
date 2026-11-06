@@ -1,0 +1,254 @@
+{
+  "array_sum": {
+    "desc": "Sequential Array Traversal (Spatial Locality)",
+    "accesses": 258,
+    "byp": {
+      "cycles": 28347,
+      "stalls": 26518,
+      "hitrate": 0.0,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 103.78
+    },
+    "l1": {
+      "cycles": 3563,
+      "stalls": 1734,
+      "hitrate": 93.41,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 7.72
+    },
+    "vc": {
+      "cycles": 3563,
+      "stalls": 1734,
+      "hitrate": 93.41,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 7.72
+    },
+    "full": {
+      "cycles": 3395,
+      "stalls": 1566,
+      "hitrate": 93.41,
+      "vc_hits": 0,
+      "pf_hits": 30,
+      "amat": 7.07
+    }
+  },
+  "vector_dot": {
+    "desc": "Vector Dot Product (RV32M MUL + Sequential Streams)",
+    "accesses": 66,
+    "byp": {
+      "cycles": 7303,
+      "stalls": 6934,
+      "hitrate": 0.0,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 106.06
+    },
+    "l1": {
+      "cycles": 2103,
+      "stalls": 1734,
+      "hitrate": 74.24,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 27.27
+    },
+    "vc": {
+      "cycles": 2103,
+      "stalls": 1734,
+      "hitrate": 74.24,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 27.27
+    },
+    "full": {
+      "cycles": 2026,
+      "stalls": 1657,
+      "hitrate": 74.24,
+      "vc_hits": 0,
+      "pf_hits": 26,
+      "amat": 26.11
+    }
+  },
+  "conflict_thrash": {
+    "desc": "Cache Conflict Thrashing (2KB Set-Collision Ping-Pong)",
+    "accesses": 34,
+    "byp": {
+      "cycles": 3815,
+      "stalls": 3670,
+      "hitrate": 0.0,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 108.94
+    },
+    "l1": {
+      "cycles": 3511,
+      "stalls": 3366,
+      "hitrate": 2.94,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 100.0
+    },
+    "vc": {
+      "cycles": 511,
+      "stalls": 366,
+      "hitrate": 2.94,
+      "vc_hits": 30,
+      "pf_hits": 0,
+      "amat": 11.76
+    },
+    "full": {
+      "cycles": 511,
+      "stalls": 366,
+      "hitrate": 2.94,
+      "vc_hits": 30,
+      "pf_hits": 0,
+      "amat": 11.76
+    }
+  },
+  "rw_persistence": {
+    "desc": "Read-Modify-Write Persistence (Dirty Eviction + Swap)",
+    "accesses": 27,
+    "byp": {
+      "cycles": 3914,
+      "stalls": 3764,
+      "hitrate": 0.0,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 140.41
+    },
+    "l1": {
+      "cycles": 762,
+      "stalls": 612,
+      "hitrate": 81.48,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 23.67
+    },
+    "vc": {
+      "cycles": 662,
+      "stalls": 512,
+      "hitrate": 81.48,
+      "vc_hits": 1,
+      "pf_hits": 0,
+      "amat": 19.96
+    },
+    "full": {
+      "cycles": 801,
+      "stalls": 651,
+      "hitrate": 81.48,
+      "vc_hits": 1,
+      "pf_hits": 2,
+      "amat": 25.11
+    }
+  },
+  "complex_ops": {
+    "desc": "Matrix Inv + Vector Dot + Array Sum + Strided Transpose",
+    "accesses": 74,
+    "byp": {
+      "cycles": 10595,
+      "stalls": 10189,
+      "hitrate": 0.0,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 138.69
+    },
+    "l1": {
+      "cycles": 2359,
+      "stalls": 1953,
+      "hitrate": 74.32,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 27.39
+    },
+    "vc": {
+      "cycles": 2359,
+      "stalls": 1953,
+      "hitrate": 74.32,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 27.39
+    },
+    "full": {
+      "cycles": 2407,
+      "stalls": 2001,
+      "hitrate": 74.32,
+      "vc_hits": 0,
+      "pf_hits": 6,
+      "amat": 28.04
+    }
+  },
+  "stride_sum": {
+    "desc": "Strided Array Sum (16B Stride across 2.5KB > 2KB L1)",
+    "accesses": 162,
+    "byp": {
+      "cycles": 37061,
+      "stalls": 16726,
+      "hitrate": 0.0,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 104.25
+    },
+    "l1": {
+      "cycles": 36757,
+      "stalls": 16422,
+      "hitrate": 0.62,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 102.37
+    },
+    "vc": {
+      "cycles": 36757,
+      "stalls": 16422,
+      "hitrate": 0.62,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 102.37
+    },
+    "full": {
+      "cycles": 21157,
+      "stalls": 822,
+      "hitrate": 0.62,
+      "vc_hits": 0,
+      "pf_hits": 312,
+      "amat": 6.07
+    }
+  },
+  "stride_mixed": {
+    "desc": "Dual Strided Streams (16B & 32B Strides + RV32M MUL)",
+    "accesses": 130,
+    "byp": {
+      "cycles": 21863,
+      "stalls": 13462,
+      "hitrate": 0.0,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 104.55
+    },
+    "l1": {
+      "cycles": 21559,
+      "stalls": 13158,
+      "hitrate": 0.77,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 102.22
+    },
+    "vc": {
+      "cycles": 21559,
+      "stalls": 13158,
+      "hitrate": 0.77,
+      "vc_hits": 0,
+      "pf_hits": 0,
+      "amat": 102.22
+    },
+    "full": {
+      "cycles": 15627,
+      "stalls": 7226,
+      "hitrate": 0.77,
+      "vc_hits": 0,
+      "pf_hits": 120,
+      "amat": 56.58
+    }
+  }
+}

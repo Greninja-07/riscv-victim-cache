@@ -1,0 +1,300 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Stride Prefetcher Block Diagram</title><style>body{margin:0;background:white}svg{width:100%;height:auto;display:block}</style></head><body><svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1490" viewBox="0 0 2400 1490">
+<rect width="2400" height="1490" fill="white"/>
+<text x="1200" y="43" text-anchor="middle" font-family="Arial, sans-serif" font-size="31" fill="#2c3e50" font-weight="bold">Hardware Multi-Degree Stride Data Prefetcher</text>
+<text x="1200" y="76" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#637583" font-weight="normal">Degree 2  •  8-entry RPT  •  4-entry fully associative prefetch buffer  •  32-bit address / 128-bit data</text>
+<rect x="25" y="105" width="475" height="680" rx="6" fill="#fbfcfd" stroke="#c4cdd4" stroke-width="1.5"/>
+<text x="43" y="136" text-anchor="start" font-family="Arial, sans-serif" font-size="21" fill="#2c3e50" font-weight="bold">Reference Prediction Table &amp; Training</text>
+<text x="55" y="179" text-anchor="start" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">load_pc[31:0]</text>
+<polyline points="195,173 220,173" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="220,173 211.0,169.0 211.0,177.0" fill="#2980b9"/>
+<rect x="220" y="145" width="105" height="105" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="272.5" y="174" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">PC split</text>
+<text x="272.5" y="205" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">[4:2]</text>
+<text x="272.5" y="230" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">[14:5]</text>
+<rect x="345" y="145" width="130" height="280" rx="6" fill="#fdf2e9" stroke="#d35400" stroke-width="2"/>
+<text x="410.0" y="174" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">RPT array</text>
+<text x="410.0" y="205" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">8 entries</text>
+<text x="410.0" y="230" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">Tag [9:0]</text>
+<text x="410.0" y="255" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">Valid</text>
+<text x="410.0" y="280" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">Conf [1:0]</text>
+<text x="410.0" y="305" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">Stride [15:0]</text>
+<text x="410.0" y="330" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">Last addr [31:0]</text>
+<polyline points="325,177 345,177" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="345,177 336.0,173.0 336.0,181.0" fill="#2980b9"/>
+<polyline points="325,210 335,210 335,235 345,235" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="345,235 336.0,231.0 336.0,239.0" fill="#2980b9"/>
+<text x="55" y="317" text-anchor="start" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">load_addr[31:0]</text>
+<polyline points="210,312 295,312 295,380 345,380" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="345,380 336.0,376.0 336.0,384.0" fill="#2980b9"/>
+<circle cx="225" cy="485" r="27" fill="#e8f8f5" stroke="#16a085" stroke-width="2"/>
+<text x="225" y="493" text-anchor="middle" font-family="Arial, sans-serif" font-size="27" fill="#2c3e50" font-weight="bold">−</text>
+<polyline points="410,425 410,445 225,445 225,458" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="225,458 229.0,449.0 221.0,449.0" fill="#2980b9"/>
+<text x="310" y="438" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#2c3e50" font-weight="normal">last_addr</text>
+<polyline points="115,329 115,485 198,485" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="198,485 189.0,481.0 189.0,489.0" fill="#2980b9"/>
+<text x="118" y="467" text-anchor="start" font-family="Arial, sans-serif" font-size="15" fill="#2c3e50" font-weight="normal">load_addr</text>
+<text x="225" y="545" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">new_stride = (load_addr − last_addr)[15:0]</text>
+<rect x="75" y="585" width="350" height="105" rx="6" fill="#f7f0fa" stroke="#2c3e50" stroke-width="2"/>
+<text x="250.0" y="614" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">Training control</text>
+<text x="250.0" y="645" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">is_load &amp; !load_stall</text>
+<text x="250.0" y="670" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">prefetch_en &amp; !cache_bypass</text>
+<polyline points="225,512 225,529" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polyline points="252,485 455,485 455,570 425,570 425,620" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="425,620 429.0,611.0 421.0,611.0" fill="#2980b9"/>
+<polyline points="75,620 50,620 50,405 345,405" fill="none" stroke="#8e44ad" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="345,405 336.0,401.0 336.0,409.0" fill="#8e44ad"/>
+<text x="75" y="728" text-anchor="start" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="bold">RPT outputs → candidate stage:</text>
+<text x="75" y="757" text-anchor="start" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">stride, confidence, valid, PC tag match</text>
+<rect x="530" y="105" width="315" height="680" rx="6" fill="#fbfcfd" stroke="#c4cdd4" stroke-width="1.5"/>
+<text x="548" y="136" text-anchor="start" font-family="Arial, sans-serif" font-size="21" fill="#2c3e50" font-weight="bold">Two-Degree Candidates</text>
+<rect x="555" y="160" width="265" height="95" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="687.5" y="189" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">Sign extension</text>
+<text x="687.5" y="220" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">signed stride [15:0] → [31:0]</text>
+<rect x="675" y="300" width="120" height="72" rx="6" fill="#e8f8f5" stroke="#2c3e50" stroke-width="2"/>
+<text x="735.0" y="329" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">Shift &lt;&lt; 1</text>
+<circle cx="610" cy="425" r="27" fill="#e8f8f5" stroke="#16a085" stroke-width="2"/>
+<text x="610" y="433" text-anchor="middle" font-family="Arial, sans-serif" font-size="27" fill="#2c3e50" font-weight="bold">+</text>
+<circle cx="755" cy="425" r="27" fill="#e8f8f5" stroke="#16a085" stroke-width="2"/>
+<text x="755" y="433" text-anchor="middle" font-family="Arial, sans-serif" font-size="27" fill="#2c3e50" font-weight="bold">+</text>
+<polyline points="610,255 610,398" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="610,398 614.0,389.0 606.0,389.0" fill="#2980b9"/>
+<polyline points="735,255 735,300" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="735,300 739.0,291.0 731.0,291.0" fill="#2980b9"/>
+<polyline points="735,372 735,385 755,385 755,398" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="755,398 759.0,389.0 751.0,389.0" fill="#2980b9"/>
+<text x="553" y="477" text-anchor="start" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">load_addr</text>
+<polyline points="555,485 570,485 570,425 583,425" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="583,425 574.0,421.0 574.0,429.0" fill="#2980b9"/>
+<polyline points="570,485 840,485 840,425 782,425" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="782,425 791.0,429.0 791.0,421.0" fill="#2980b9"/>
+<rect x="550" y="535" width="130" height="95" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="615.0" y="564" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">Align 1</text>
+<text x="615.0" y="595" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">[3:0] = 0</text>
+<rect x="695" y="535" width="130" height="95" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="760.0" y="564" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">Align 2</text>
+<text x="760.0" y="595" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">[3:0] = 0</text>
+<polyline points="610,452 610,535" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="610,535 614.0,526.0 606.0,526.0" fill="#2980b9"/>
+<polyline points="755,452 755,535" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="755,535 759.0,526.0 751.0,526.0" fill="#2980b9"/>
+<text x="615" y="672" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2980b9" font-weight="bold">Candidate 1</text>
+<text x="760" y="703" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2980b9" font-weight="bold">Candidate 2</text>
+<polyline points="615,630 615,651" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polyline points="760,630 760,681" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<text x="687" y="754" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">+1 stride                 +2 strides</text>
+<rect x="875" y="105" width="330" height="680" rx="6" fill="#fbfcfd" stroke="#c4cdd4" stroke-width="1.5"/>
+<text x="893" y="136" text-anchor="start" font-family="Arial, sans-serif" font-size="21" fill="#2c3e50" font-weight="bold">Validation &amp; Pending Queue</text>
+<rect x="895" y="160" width="290" height="270" rx="6" fill="#f4f9fd" stroke="#2c3e50" stroke-width="2"/>
+<text x="1040.0" y="189" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">Candidate filters</text>
+<text x="1040.0" y="220" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">Confidence / PC qualification</text>
+<text x="1040.0" y="245" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">Address &lt; 16384</text>
+<text x="1040.0" y="270" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">Different from current line</text>
+<text x="1040.0" y="295" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">!l1_tag_hit</text>
+<text x="1040.0" y="320" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">Not in prefetch buffer</text>
+<text x="1040.0" y="345" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">Not in flight</text>
+<polyline points="615,630 615,645 855,645 855,250 895,250" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="895,250 886.0,246.0 886.0,254.0" fill="#2980b9"/>
+<polyline points="760,630 760,655 865,655 865,310 895,310" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="895,310 886.0,306.0 886.0,314.0" fill="#2980b9"/>
+<rect x="910" y="490" width="260" height="80" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="1040.0" y="519" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">pending_addr2</text>
+<text x="1040.0" y="550" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">Candidate 2 + valid</text>
+<rect x="910" y="635" width="260" height="80" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="1040.0" y="664" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">pending_addr</text>
+<text x="1040.0" y="695" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">Candidate 1 + valid</text>
+<polyline points="990,430 990,490" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="990,490 994.0,481.0 986.0,481.0" fill="#2980b9"/>
+<text x="1035" y="467" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#2980b9" font-weight="normal">Cand 2</text>
+<polyline points="1135,430 1190,430 1190,675 1170,675" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1170,675 1179.0,679.0 1179.0,671.0" fill="#2980b9"/>
+<text x="1160" y="457" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#2980b9" font-weight="normal">Cand 1</text>
+<polyline points="1040,570 1040,635" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1040,635 1044.0,626.0 1036.0,626.0" fill="#2980b9"/>
+<text x="1065" y="609" text-anchor="start" font-family="Arial, sans-serif" font-size="16" fill="#2980b9" font-weight="normal">shift</text>
+<polyline points="1040,715 1040,815" fill="none" stroke="#8e44ad" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1040,815 1044.0,806.0 1036.0,806.0" fill="#8e44ad"/>
+<text x="1080" y="761" text-anchor="start" font-family="Arial, sans-serif" font-size="16" fill="#8e44ad" font-weight="normal">issue</text>
+<rect x="1240" y="105" width="1135" height="680" rx="6" fill="#fbfcfd" stroke="#c4cdd4" stroke-width="1.5"/>
+<text x="1258" y="136" text-anchor="start" font-family="Arial, sans-serif" font-size="21" fill="#2c3e50" font-weight="bold">4-Entry Fully-Associative Prefetch Buffer &amp; Demand Resolution</text>
+<text x="1290" y="181" text-anchor="start" font-family="Arial, sans-serif" font-size="17" fill="#238b57" font-weight="normal">Fill: main_mem_rdata[127:0] + tag + allocation slot</text>
+<text x="1470" y="226" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#2c3e50" font-weight="bold">Buffer registers</text>
+<text x="1765" y="226" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="bold">Tag ==</text>
+<text x="1870" y="226" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="bold">Valid AND</text>
+<text x="1725" y="195" text-anchor="start" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">Demand tag = l1_mem_addr[31:4]</text>
+<rect x="1270" y="255" width="50" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<rect x="1320" y="255" width="155" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<rect x="1475" y="255" width="175" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="1295" y="290" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">V0</text>
+<text x="1397" y="290" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">PF tag 0 [27:0]</text>
+<text x="1562" y="290" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">PF data 0</text>
+<rect x="1725" y="255" width="80" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="1765.0" y="284" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">==</text>
+<rect x="1830" y="255" width="80" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="1870.0" y="284" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">AND</text>
+<polyline points="1475,269 1705,269 1705,283 1725,283" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1725,283 1716.0,279.0 1716.0,287.0" fill="#2980b9"/>
+<polyline points="1805,283 1830,283" fill="none" stroke="#2c3e50" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1830,283 1821.0,279.0 1821.0,287.0" fill="#2c3e50"/>
+<text x="1868" y="337" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#c0392b" font-weight="normal">V0 + tag match → H0</text>
+<polyline points="1910,283 1960,283" fill="none" stroke="#c0392b" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1960,283 1951.0,279.0 1951.0,287.0" fill="#c0392b"/>
+<text x="1982" y="289" text-anchor="start" font-family="Arial, sans-serif" font-size="16" fill="#c0392b" font-weight="normal">H0</text>
+<text x="1562" y="335" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#2980b9" font-weight="normal">D0 [127:0] → data MUX</text>
+<rect x="1270" y="345" width="50" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<rect x="1320" y="345" width="155" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<rect x="1475" y="345" width="175" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="1295" y="380" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">V1</text>
+<text x="1397" y="380" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">PF tag 1 [27:0]</text>
+<text x="1562" y="380" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">PF data 1</text>
+<rect x="1725" y="345" width="80" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="1765.0" y="374" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">==</text>
+<rect x="1830" y="345" width="80" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="1870.0" y="374" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">AND</text>
+<polyline points="1475,359 1705,359 1705,373 1725,373" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1725,373 1716.0,369.0 1716.0,377.0" fill="#2980b9"/>
+<polyline points="1805,373 1830,373" fill="none" stroke="#2c3e50" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1830,373 1821.0,369.0 1821.0,377.0" fill="#2c3e50"/>
+<text x="1868" y="427" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#c0392b" font-weight="normal">V1 + tag match → H1</text>
+<polyline points="1910,373 1960,373" fill="none" stroke="#c0392b" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1960,373 1951.0,369.0 1951.0,377.0" fill="#c0392b"/>
+<text x="1982" y="379" text-anchor="start" font-family="Arial, sans-serif" font-size="16" fill="#c0392b" font-weight="normal">H1</text>
+<text x="1562" y="425" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#2980b9" font-weight="normal">D1 [127:0] → data MUX</text>
+<rect x="1270" y="435" width="50" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<rect x="1320" y="435" width="155" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<rect x="1475" y="435" width="175" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="1295" y="470" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">V2</text>
+<text x="1397" y="470" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">PF tag 2 [27:0]</text>
+<text x="1562" y="470" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">PF data 2</text>
+<rect x="1725" y="435" width="80" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="1765.0" y="464" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">==</text>
+<rect x="1830" y="435" width="80" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="1870.0" y="464" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">AND</text>
+<polyline points="1475,449 1705,449 1705,463 1725,463" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1725,463 1716.0,459.0 1716.0,467.0" fill="#2980b9"/>
+<polyline points="1805,463 1830,463" fill="none" stroke="#2c3e50" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1830,463 1821.0,459.0 1821.0,467.0" fill="#2c3e50"/>
+<text x="1868" y="517" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#c0392b" font-weight="normal">V2 + tag match → H2</text>
+<polyline points="1910,463 1960,463" fill="none" stroke="#c0392b" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1960,463 1951.0,459.0 1951.0,467.0" fill="#c0392b"/>
+<text x="1982" y="469" text-anchor="start" font-family="Arial, sans-serif" font-size="16" fill="#c0392b" font-weight="normal">H2</text>
+<text x="1562" y="515" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#2980b9" font-weight="normal">D2 [127:0] → data MUX</text>
+<rect x="1270" y="525" width="50" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<rect x="1320" y="525" width="155" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<rect x="1475" y="525" width="175" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="1295" y="560" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">V3</text>
+<text x="1397" y="560" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">PF tag 3 [27:0]</text>
+<text x="1562" y="560" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">PF data 3</text>
+<rect x="1725" y="525" width="80" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="1765.0" y="554" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">==</text>
+<rect x="1830" y="525" width="80" height="57" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="1870.0" y="554" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">AND</text>
+<polyline points="1475,539 1705,539 1705,553 1725,553" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1725,553 1716.0,549.0 1716.0,557.0" fill="#2980b9"/>
+<polyline points="1805,553 1830,553" fill="none" stroke="#2c3e50" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1830,553 1821.0,549.0 1821.0,557.0" fill="#2c3e50"/>
+<text x="1868" y="607" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#c0392b" font-weight="normal">V3 + tag match → H3</text>
+<polyline points="1910,553 1960,553" fill="none" stroke="#c0392b" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1960,553 1951.0,549.0 1951.0,557.0" fill="#c0392b"/>
+<text x="1982" y="559" text-anchor="start" font-family="Arial, sans-serif" font-size="16" fill="#c0392b" font-weight="normal">H3</text>
+<text x="1562" y="605" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#2980b9" font-weight="normal">D3 [127:0] → data MUX</text>
+<rect x="2050" y="255" width="280" height="90" rx="6" fill="#f9ebea" stroke="#c0392b" stroke-width="2"/>
+<text x="2190.0" y="284" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">Hit OR</text>
+<text x="2190.0" y="315" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">H0 | H1 | H2 | H3</text>
+<text x="2190" y="374" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#c0392b" font-weight="normal">→ l1_hit_pf_buf</text>
+<rect x="2050" y="410" width="280" height="100" rx="6" fill="#e8f8f5" stroke="#2c3e50" stroke-width="2"/>
+<text x="2190.0" y="439" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">Priority encoder</text>
+<text x="2190.0" y="470" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">H[3:0] → hit_idx[1:0]</text>
+<polygon points="2110,565 2235,590 2235,690 2110,715" fill="#fdf2e9" stroke="#d35400" stroke-width="2"/>
+<text x="2172.5" y="640.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#2c3e50" font-weight="bold">4:1 MUX</text>
+<text x="2070" y="595" text-anchor="end" font-family="Arial, sans-serif" font-size="17" fill="#2980b9" font-weight="normal">D0</text>
+<polyline points="2080,590 2110,590" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="2110,590 2101.0,586.0 2101.0,594.0" fill="#2980b9"/>
+<text x="2070" y="623" text-anchor="end" font-family="Arial, sans-serif" font-size="17" fill="#2980b9" font-weight="normal">D1</text>
+<polyline points="2080,618 2110,618" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="2110,618 2101.0,614.0 2101.0,622.0" fill="#2980b9"/>
+<text x="2070" y="651" text-anchor="end" font-family="Arial, sans-serif" font-size="17" fill="#2980b9" font-weight="normal">D2</text>
+<polyline points="2080,646 2110,646" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="2110,646 2101.0,642.0 2101.0,650.0" fill="#2980b9"/>
+<text x="2070" y="679" text-anchor="end" font-family="Arial, sans-serif" font-size="17" fill="#2980b9" font-weight="normal">D3</text>
+<polyline points="2080,674 2110,674" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="2110,674 2101.0,670.0 2101.0,678.0" fill="#2980b9"/>
+<polyline points="2190,510 2190,555 2175,555 2175,578" fill="none" stroke="#8e44ad" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="2175,578 2179.0,569.0 2171.0,569.0" fill="#8e44ad"/>
+<text x="2260" y="550" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#8e44ad" font-weight="normal">hit_idx</text>
+<polyline points="2235,640 2340,640" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="2340,640 2331.0,636.0 2331.0,644.0" fill="#2980b9"/>
+<text x="2285" y="682" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#2980b9" font-weight="normal">pf_data_mux</text>
+<text x="1280" y="707" text-anchor="start" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">H0–H3: per-entry valid AND matching tag; read demand and enable qualify the buffer hit.</text>
+<text x="1280" y="747" text-anchor="start" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">Named nets D0–D3 connect the four data registers to the MUX; hit_idx selects the returned line.</text>
+<rect x="875" y="815" width="330" height="340" rx="6" fill="#fbfcfd" stroke="#c4cdd4" stroke-width="1.5"/>
+<text x="893" y="846" text-anchor="start" font-family="Arial, sans-serif" font-size="21" fill="#2c3e50" font-weight="bold">FSM Memory Arbiter</text>
+<rect x="900" y="870" width="280" height="70" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="1040.0" y="899" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">State register</text>
+<text x="1040.0" y="930" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">S_IDLE / S_PREF_WAIT</text>
+<rect x="900" y="965" width="280" height="75" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="1040.0" y="994" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">In-flight tracking</text>
+<text x="1040.0" y="1025" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">tag [27:0], valid, invalid</text>
+<rect x="900" y="1070" width="280" height="60" rx="6" fill="#fdf2e9" stroke="#2c3e50" stroke-width="2"/>
+<text x="1040.0" y="1099" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">Allocation MUX</text>
+<polyline points="1040,940 1040,965" fill="none" stroke="#8e44ad" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1040,965 1044.0,956.0 1036.0,956.0" fill="#8e44ad"/>
+<polyline points="1040,1040 1040,1070" fill="none" stroke="#8e44ad" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1040,1070 1044.0,1061.0 1036.0,1061.0" fill="#8e44ad"/>
+<rect x="1240" y="815" width="1135" height="340" rx="6" fill="#fbfcfd" stroke="#c4cdd4" stroke-width="1.5"/>
+<text x="1258" y="846" text-anchor="start" font-family="Arial, sans-serif" font-size="21" fill="#2c3e50" font-weight="bold">Main Memory Interface &amp; L1 Response Selection</text>
+<text x="1270" y="875" text-anchor="start" font-family="Arial, sans-serif" font-size="18" fill="#238b57" font-weight="normal">main_mem_req / main_mem_addr / main_mem_we → main memory</text>
+<text x="1270" y="915" text-anchor="start" font-family="Arial, sans-serif" font-size="18" fill="#238b57" font-weight="normal">main_mem_ack / main_mem_rdata ← main memory</text>
+<polyline points="1180,1000 1218,1000 1218,855 1240,855" fill="none" stroke="#238b57" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1240,855 1231.0,851.0 1231.0,859.0" fill="#238b57"/>
+<text x="1450" y="976" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2980b9" font-weight="normal">pf_data_mux [127:0]</text>
+<text x="1450" y="1036" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2980b9" font-weight="normal">main_mem_rdata [127:0]</text>
+<polygon points="1660,950 1760,975 1760,1055 1660,1080" fill="#fdf2e9" stroke="#d35400" stroke-width="2"/>
+<text x="1710.0" y="1015.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#2c3e50" font-weight="bold">MUX</text>
+<polyline points="1560,970 1660,970" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1660,970 1651.0,966.0 1651.0,974.0" fill="#2980b9"/>
+<polyline points="1580,1030 1660,1030" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1660,1030 1651.0,1026.0 1651.0,1034.0" fill="#2980b9"/>
+<polyline points="1760,1015 1910,1015" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1910,1015 1901.0,1011.0 1901.0,1019.0" fill="#2980b9"/>
+<text x="1835" y="1090" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2980b9" font-weight="normal">l1_mem_rdata [127:0]</text>
+<text x="2060" y="976" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">1&#x27;b1 (hit)</text>
+<text x="2060" y="1036" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">main_mem_ack</text>
+<polygon points="2170,950 2255,975 2255,1055 2170,1080" fill="#fdf2e9" stroke="#d35400" stroke-width="2"/>
+<text x="2212.5" y="1015.0" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#2c3e50" font-weight="bold">MUX</text>
+<polyline points="2120,970 2170,970" fill="none" stroke="#2c3e50" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="2170,970 2161.0,966.0 2161.0,974.0" fill="#2c3e50"/>
+<polyline points="2145,1030 2170,1030" fill="none" stroke="#2c3e50" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="2170,1030 2161.0,1026.0 2161.0,1034.0" fill="#2c3e50"/>
+<polyline points="2255,1015 2340,1015" fill="none" stroke="#2c3e50" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="2340,1015 2331.0,1011.0 2331.0,1019.0" fill="#2c3e50"/>
+<text x="2290" y="1090" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">l1_mem_ack</text>
+<text x="1270" y="1124" text-anchor="start" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">Response control: buffer hit / in-flight merge, arbiter state and bypass mode.</text>
+<rect x="25" y="1185" width="2350" height="230" rx="6" fill="#fbfcfd" stroke="#c4cdd4" stroke-width="1.5"/>
+<text x="43" y="1216" text-anchor="start" font-family="Arial, sans-serif" font-size="21" fill="#2c3e50" font-weight="bold">Store Coherence &amp; Invalidation Broadcast Network</text>
+<text x="60" y="1270" text-anchor="start" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="normal">store_addr[31:0]</text>
+<rect x="285" y="1230" width="120" height="75" rx="6" fill="white" stroke="#2c3e50" stroke-width="2"/>
+<text x="345.0" y="1259" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">[31:4]</text>
+<polyline points="240,1263 285,1263" fill="none" stroke="#2980b9" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="285,1263 276.0,1259.0 276.0,1267.0" fill="#2980b9"/>
+<text x="500" y="1252" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#c0392b" font-weight="normal">store_tag [27:0]</text>
+<polyline points="405,1265 2240,1265" fill="none" stroke="#c0392b" stroke-width="3" stroke-linejoin="round"/>
+<polyline points="760,1265 760,1287" fill="none" stroke="#c0392b" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="760,1287 764.0,1278.0 756.0,1278.0" fill="#c0392b"/>
+<rect x="545" y="1287" width="430" height="95" rx="6" fill="#fdf2f1" stroke="#c0392b" stroke-width="2"/>
+<text x="760.0" y="1316" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">Pending tag compare</text>
+<text x="760.0" y="1347" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">Cancel matching pending request</text>
+<polyline points="1325,1265 1325,1287" fill="none" stroke="#c0392b" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1325,1287 1329.0,1278.0 1321.0,1278.0" fill="#c0392b"/>
+<rect x="1110" y="1287" width="430" height="95" rx="6" fill="#fdf2f1" stroke="#c0392b" stroke-width="2"/>
+<text x="1325.0" y="1316" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">In-flight tag compare</text>
+<text x="1325.0" y="1347" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">Set inflight_invalid</text>
+<polyline points="1910,1265 1910,1287" fill="none" stroke="#c0392b" stroke-width="2.4" stroke-linejoin="round"/>
+<polygon points="1910,1287 1914.0,1278.0 1906.0,1278.0" fill="#c0392b"/>
+<rect x="1695" y="1287" width="430" height="95" rx="6" fill="#fdf2f1" stroke="#c0392b" stroke-width="2"/>
+<text x="1910.0" y="1316" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="bold">Buffer tag compares</text>
+<text x="1910.0" y="1347" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#2c3e50" font-weight="normal">Invalidate matching buffer entry</text>
+<text x="60" y="1350" text-anchor="start" font-family="Arial, sans-serif" font-size="19" fill="#2c3e50" font-weight="normal">store_valid</text>
+<text x="60" y="1384" text-anchor="start" font-family="Arial, sans-serif" font-size="16" fill="#2c3e50" font-weight="normal">qualifies comparisons</text>
+<text x="1200" y="1455" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#637583" font-weight="normal">Blue: address / data  •  Purple: control  •  Green: memory interface  •  Red: hit / coherence  |  Named nets indicate connections without crossing unrelated blocks.</text>
+</svg></body></html>

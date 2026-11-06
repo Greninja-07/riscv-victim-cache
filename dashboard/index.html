@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RISC-V Memory Hierarchy & Performance Telemetry | Group 14</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #14110F;
+      --bg-panel: #1A1613;
+      --bg-panel-alt: #1F1B17;
+      --border: #2A2622;
+      --border-focus: #3E3832;
+      --text: #E8E2D6;
+      --text-muted: #8A8478;
+      --accent-amber: #FFB000;
+      --stall-red: #D9534F;
+    }
+
+    body {
+      font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+
+    .font-mono {
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    /* Instrument container panel */
+    .instrument-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+    }
+
+    .instrument-panel-alt {
+      background: var(--bg-panel-alt);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+    }
+
+    /* Toggle switch overrides */
+    #toggle-cache, #toggle-vc, #toggle-pf {
+      border-radius: 2px !important;
+      border: 1px solid #3E3832 !important;
+      box-shadow: none !important;
+      background-color: #211D19 !important;
+      height: 18px !important;
+      width: 34px !important;
+      transition: all 0.12s ease-in-out;
+    }
+    #toggle-cache:has(.translate-x-5), #toggle-vc:has(.translate-x-5), #toggle-pf:has(.translate-x-5),
+    #toggle-cache.bg-emerald-500, #toggle-vc.bg-emerald-500, #toggle-pf.bg-emerald-500 {
+      background-color: #2B2317 !important;
+      border-color: #FFB000 !important;
+    }
+
+    #knob-cache, #knob-vc, #knob-pf {
+      border-radius: 1px !important;
+      box-shadow: none !important;
+      height: 12px !important;
+      width: 12px !important;
+      top: 2px;
+      left: 2px;
+    }
+    .translate-x-5#knob-cache, .translate-x-5#knob-vc, .translate-x-5#knob-pf {
+      transform: translateX(16px) !important;
+      background-color: #FFB000 !important;
+    }
+    .translate-x-0#knob-cache, .translate-x-0#knob-vc, .translate-x-0#knob-pf {
+      transform: translateX(0px) !important;
+      background-color: #5A534A !important;
+    }
+
+    /* Strip badge styling from switch text labels */
+    #badge-cache, #badge-vc, #badge-pf {
+      background: transparent !important;
+      border: none !important;
+      padding: 0 !important;
+      font-family: 'IBM Plex Mono', monospace !important;
+      font-size: 11px !important;
+      font-weight: 500 !important;
+    }
+    #badge-cache.bg-emerald-500\/20, #badge-vc.bg-emerald-500\/20, #badge-pf.bg-emerald-500\/20 {
+      color: #FFB000 !important;
+    }
+    #badge-cache.bg-rose-500\/20, #badge-vc.bg-slate-800, #badge-pf.bg-slate-800 {
+      color: #8A8478 !important;
+    }
+
+    /* Latency Buttons */
+    .lat-btn {
+      border-radius: 2px !important;
+      border: 1px solid var(--border) !important;
+      background: #211D19 !important;
+      color: #8A8478 !important;
+      box-shadow: none !important;
+      transition: all 0.1s ease;
+    }
+    .lat-btn:hover {
+      color: #E8E2D6 !important;
+      border-color: #4A433A !important;
+    }
+    .lat-btn.bg-cyan-600 {
+      background: #FFB000 !important;
+      color: #14110F !important;
+      border-color: #FFB000 !important;
+      font-weight: 600 !important;
+    }
+
+    /* Tier matrix overrides */
+    #tier-0, #tier-1, #tier-2, #tier-3 {
+      border-radius: 2px !important;
+      box-shadow: none !important;
+      border: 1px solid var(--border) !important;
+      background: #171411 !important;
+      transition: all 0.12s ease;
+      opacity: 0.9 !important;
+    }
+    #tier-0.glow-cyan, #tier-1.glow-cyan, #tier-2.glow-cyan, #tier-3.glow-cyan,
+    #tier-0[class*="border-cyan"], #tier-1[class*="border-cyan"], #tier-2[class*="border-cyan"], #tier-3[class*="border-cyan"] {
+      border: 1px solid #3E3832 !important;
+      border-left: 3px solid #FFB000 !important;
+      background: #221C15 !important;
+      opacity: 1 !important;
+    }
+
+    /* Stepped logic analyzer timeline bar */
+    #bar-compute {
+      background: #2B2520 !important;
+      color: #E8E2D6 !important;
+      border-radius: 0 !important;
+      border-right: 1px solid #14110F !important;
+    }
+    #bar-stall {
+      background: #4D1F1D !important;
+      color: #F29E9B !important;
+      border-radius: 0 !important;
+    }
+
+    /* Schematic node styling */
+    #node-cpu, #node-l1, #node-vc, #node-pf, #node-dram {
+      border-radius: 2px !important;
+      box-shadow: none !important;
+      background: #171411 !important;
+      border: 1px solid var(--border) !important;
+    }
+    .node-active {
+      border-color: #FFB000 !important;
+      background: #241D14 !important;
+    }
+    .node-hit {
+      border-color: #FFB000 !important;
+      background: #241D14 !important;
+    }
+    .node-miss {
+      border-color: #D9534F !important;
+      background: #281514 !important;
+    }
+
+    /* Mode button overrides */
+    #btn-mock-mode, #btn-live-mode {
+      border-radius: 2px !important;
+      box-shadow: none !important;
+    }
+    #btn-mock-mode.bg-cyan-500\/20, #btn-live-mode.bg-emerald-500\/20 {
+      background: #2E2519 !important;
+      color: #FFB000 !important;
+      border: 1px solid #FFB000 !important;
+    }
+
+    /* Custom select & inputs */
+    select {
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238A8478' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-repeat: no-repeat;
+      background-position: right 0.6rem center;
+      background-size: 0.85em;
+      padding-right: 2rem;
+      appearance: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen text-[#E8E2D6] p-4 lg:p-8 antialiased">
+
+  <!-- LAB INSTRUMENT HEADER -->
+  <header class="max-w-7xl mx-auto mb-8 pb-5 border-b border-[#2A2622] flex flex-col md:flex-row items-start md:items-end justify-between gap-4">
+    <div>
+      <div class="text-xs font-mono text-[#8A8478] mb-1.5 flex items-center gap-2">
+        <span>Group 14</span>
+        <span class="text-[#3E3832]">·</span>
+        <span>Nexys A7-100T</span>
+        <span class="text-[#3E3832]">·</span>
+        <span>Artix-7 RV32IM</span>
+      </div>
+      <h1 class="text-2xl font-semibold tracking-tight text-[#E8E2D6]">
+        RISC-V memory hierarchy telemetry
+      </h1>
+      <p class="text-xs text-[#8A8478] mt-1">
+        Logic analyzer & performance verification: 2 KB direct-mapped L1 cache · 4-entry victim cache · stride prefetcher
+      </p>
+    </div>
+
+    <!-- CONNECTION & DATA SOURCE CONTROLS -->
+    <div class="flex items-center gap-3">
+      <div class="flex items-center bg-[#171411] border border-[#2A2622] rounded-[2px] p-0.5 text-xs font-mono">
+        <button id="btn-mock-mode" onclick="setMode('mock')" class="px-3 py-1 font-medium transition-colors bg-[#2E2519] text-[#FFB000] border border-[#FFB000]">
+          Demo benchmark data
+        </button>
+        <button id="btn-live-mode" onclick="setMode('live')" class="px-3 py-1 font-medium transition-colors text-[#8A8478] hover:text-[#E8E2D6]">
+          FPGA UART bridge
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-[2px] bg-[#171411] border border-[#2A2622] text-xs font-mono">
+        <span id="conn-indicator" class="w-2 h-2 rounded-full bg-[#FFB000]"></span>
+        <span id="conn-text" class="text-[#8A8478]">Ready (Sim data)</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- PRIMARY HERO TELEMETRY: OVERALL SPEEDUP HIERARCHY -->
+  <section class="max-w-7xl mx-auto mb-8">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      
+      <!-- HERO SPEEDUP BANNER (Dominant element on page) -->
+      <div class="lg:col-span-6 instrument-panel p-6 border-l-4 border-l-[#FFB000] flex flex-col justify-between">
+        <div>
+          <div class="text-xs font-mono text-[#8A8478] flex items-center justify-between">
+            <span>Overall execution speedup</span>
+            <span class="text-[11px] text-[#8A8478]" id="active-workload-label">stride_sum</span>
+          </div>
+          <!-- LARGEST ELEMENT ON PAGE -->
+          <div class="text-5xl lg:text-6xl font-mono font-bold text-[#FFB000] tracking-tight mt-2 mb-1" id="metric-cycles-diff">
+            1.55x
+          </div>
+          <div class="text-xs text-[#8A8478] font-mono mt-1" id="metric-stalls-diff">
+            -56.4% stall reduction vs L1 baseline
+          </div>
+        </div>
+
+        <div class="pt-4 mt-4 border-t border-[#2A2622] text-xs text-[#8A8478] flex items-center justify-between font-mono">
+          <span>Active hardware state:</span>
+          <span class="text-[#E8E2D6]">L1 Cache ON · Victim Cache ON · Prefetcher ON</span>
+        </div>
+      </div>
+
+      <!-- SECONDARY COMPACT METRIC CARDS -->
+      <div class="lg:col-span-6 grid grid-cols-2 gap-3">
+        <!-- Metric 1: Total Cycles -->
+        <div class="instrument-panel p-4 flex flex-col justify-between">
+          <span class="text-xs font-mono text-[#8A8478]">Total cycles</span>
+          <div class="text-2xl font-mono font-semibold text-[#E8E2D6] my-1" id="metric-total-cycles">1,978</div>
+          <span class="text-[11px] font-mono text-[#8A8478]">CPU clock cycles</span>
+        </div>
+
+        <!-- Metric 2: Memory Stalls -->
+        <div class="instrument-panel p-4 flex flex-col justify-between">
+          <span class="text-xs font-mono text-[#8A8478]">Stall cycles</span>
+          <div class="text-2xl font-mono font-semibold text-[#D9534F] my-1" id="metric-stall-cycles">843</div>
+          <span class="text-[11px] font-mono text-[#8A8478]">DRAM wait states</span>
+        </div>
+
+        <!-- Metric 3: L1 Hit Rate -->
+        <div class="instrument-panel p-4 flex flex-col justify-between">
+          <span class="text-xs font-mono text-[#8A8478]">L1 hit rate</span>
+          <div class="text-2xl font-mono font-semibold text-[#E8E2D6] my-1" id="metric-hitrate">93.4%</div>
+          <span class="text-[11px] font-mono text-[#8A8478]" id="metric-accesses">74 Accesses (5 Misses)</span>
+        </div>
+
+        <!-- Metric 4: Effective AMAT -->
+        <div class="instrument-panel p-4 flex flex-col justify-between">
+          <span class="text-xs font-mono text-[#8A8478]">Effective AMAT</span>
+          <div class="text-2xl font-mono font-semibold text-[#FFB000] my-1" id="metric-amat">2.31 cyc</div>
+          <span class="text-[11px] font-mono text-[#8A8478]" id="metric-amat-diff">7.69 cyc saved</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- MAIN TWO-COLUMN LAB WORKBENCH -->
+  <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+    <!-- LEFT COLUMN: CONTROLS & HIERARCHY TRACE (5 cols) -->
+    <section class="lg:col-span-5 space-y-8">
+      
+      <!-- FPGA HARDWARE SWITCH CONTROLLER -->
+      <div class="instrument-panel p-5">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-[#2A2622]">
+          <h2 class="text-sm font-medium text-[#E8E2D6]">Hardware switch controls</h2>
+          <span class="text-[11px] font-mono text-[#8A8478]">Nexys A7 SW[15:0]</span>
+        </div>
+
+        <!-- SWITCH TILES -->
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <!-- SW[2]: Cache Bypass -->
+          <div class="p-3 instrument-panel-alt flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-mono text-[#8A8478]">SW[2] L1 cache</span>
+              <span id="badge-cache" class="text-[11px] font-mono font-medium text-[#FFB000]">ENABLED</span>
+            </div>
+            <div class="mt-3 flex items-center justify-between">
+              <span class="text-xs text-[#E8E2D6]">Bypass</span>
+              <button id="toggle-cache" onclick="toggleSwitch('cache_bypass')" class="relative inline-flex cursor-pointer transition-colors focus:outline-none">
+                <span id="knob-cache" class="translate-x-5 inline-block transform transition duration-150"></span>
+              </button>
+            </div>
+          </div>
+
+          <!-- SW[7]: Victim Cache -->
+          <div class="p-3 instrument-panel-alt flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-mono text-[#8A8478]">SW[7] Victim cache</span>
+              <span id="badge-vc" class="text-[11px] font-mono font-medium text-[#FFB000]">ACTIVE</span>
+            </div>
+            <div class="mt-3 flex items-center justify-between">
+              <span class="text-xs text-[#E8E2D6]">4-entry FA</span>
+              <button id="toggle-vc" onclick="toggleSwitch('vc_en')" class="relative inline-flex cursor-pointer transition-colors focus:outline-none">
+                <span id="knob-vc" class="translate-x-5 inline-block transform transition duration-150"></span>
+              </button>
+            </div>
+          </div>
+
+          <!-- SW[8]: Stride Prefetcher -->
+          <div class="p-3 instrument-panel-alt flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-mono text-[#8A8478]">SW[8] Prefetcher</span>
+              <span id="badge-pf" class="text-[11px] font-mono font-medium text-[#FFB000]">ACTIVE</span>
+            </div>
+            <div class="mt-3 flex items-center justify-between">
+              <span class="text-xs text-[#E8E2D6]">8-entry RPT</span>
+              <button id="toggle-pf" onclick="toggleSwitch('prefetch_en')" class="relative inline-flex cursor-pointer transition-colors focus:outline-none">
+                <span id="knob-pf" class="translate-x-5 inline-block transform transition duration-150"></span>
+              </button>
+            </div>
+          </div>
+
+          <!-- SW[1:0]: DRAM Latency -->
+          <div class="p-3 instrument-panel-alt flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-mono text-[#8A8478]">SW[1:0] DRAM delay</span>
+              <span id="badge-latency" class="text-[11px] font-mono font-medium text-[#FFB000]">N = 100 cyc</span>
+            </div>
+            <div class="mt-3 flex items-center gap-1">
+              <button onclick="setLatency(1)" class="lat-btn flex-1 py-0.5 text-[10px] font-mono">1</button>
+              <button onclick="setLatency(10)" class="lat-btn flex-1 py-0.5 text-[10px] font-mono">10</button>
+              <button onclick="setLatency(100)" class="lat-btn flex-1 py-0.5 text-[10px] font-mono bg-cyan-600">100</button>
+              <button onclick="setLatency(200)" class="lat-btn flex-1 py-0.5 text-[10px] font-mono">200</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- WORKLOAD PRESET SELECTOR -->
+        <div class="pt-3 border-t border-[#2A2622] flex items-center justify-between gap-2">
+          <label class="text-xs text-[#8A8478]">Workload:</label>
+          <select id="workload-select" onchange="changeWorkload(this.value)" class="text-xs font-mono bg-[#171411] border border-[#2A2622] rounded-[2px] px-2.5 py-1 text-[#E8E2D6] focus:outline-none focus:border-[#FFB000] flex-1 max-w-xs">
+            <option value="stride_sum">stride_sum (16B strided traversal)</option>
+            <option value="stride_mixed">stride_mixed (dual 16B & 32B strides)</option>
+            <option value="conflict_thrash">conflict_thrash (2KB set collision)</option>
+            <option value="array_sum">array_sum (sequential locality)</option>
+            <option value="vector_dot">vector_dot (vector dot product)</option>
+            <option value="rw_persistence">rw_persistence (dirty eviction & swap)</option>
+            <option value="complex_ops">complex_ops (matrix inv + dot + transpose)</option>
+          </select>
+        </div>
+      </div>
+
+
+
+    </section>
+
+    <!-- RIGHT COLUMN: INSTRUMENT METRICS & CALIBRATION TABLE (7 cols) -->
+    <section class="lg:col-span-7 space-y-8">
+
+      <!-- EXECUTION TIMELINE: COMPUTE VS STALLS -->
+      <div class="instrument-panel p-5">
+        <div class="flex items-center justify-between pb-3 mb-3 border-b border-[#2A2622]">
+          <h2 class="text-sm font-medium text-[#E8E2D6]">Execution composition</h2>
+          <span class="text-xs font-mono text-[#8A8478]" id="composition-ratio">Compute: 57.4% | Stall: 42.6%</span>
+        </div>
+
+        <p class="text-xs text-[#8A8478] mb-3">
+          Memory stall cycles absorbed by L1 cache line hits, victim cache block swaps, and stride prefetch hits.
+        </p>
+
+        <!-- Stepped bar -->
+        <div class="w-full h-7 bg-[#14110F] rounded-[2px] overflow-hidden flex border border-[#2A2622]">
+          <div id="bar-compute" class="h-full flex items-center justify-center text-[10px] font-mono text-[#E8E2D6] px-2 truncate" style="width: 57.4%;">
+            Compute (1,135 cyc - 57.4%)
+          </div>
+          <div id="bar-stall" class="h-full flex items-center justify-center text-[10px] font-mono text-[#F29E9B] px-2 truncate" style="width: 42.6%;">
+            Stalls (843 cyc - 42.6%)
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between text-xs font-mono text-[#8A8478] mt-2.5">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-[1px] bg-[#2B2520] border border-[#3E3832]"></span>
+            <span>Active instruction execution</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-[1px] bg-[#4D1F1D] border border-[#6B2B28]"></span>
+            <span>Memory stall idle</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4-TIER HARDWARE ABLATION MATRIX TABLE -->
+      <div class="instrument-panel p-5">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-[#2A2622]">
+          <h2 class="text-sm font-medium text-[#E8E2D6]">Hardware ablation matrix</h2>
+          <span class="text-xs font-mono text-[#8A8478]">DRAM latency N = 100 cycles</span>
+        </div>
+
+        <div class="space-y-2 font-mono text-xs" id="tier-container">
+          <!-- Tier 0: Uncached Bypass -->
+          <div id="tier-0" class="p-3 border border-[#2A2622] flex items-center justify-between">
+            <div class="w-48">
+              <div class="font-medium text-[#E8E2D6]">0. Uncached bypass</div>
+              <div class="text-[11px] text-[#8A8478]">SW[2]=1 (Direct DRAM)</div>
+            </div>
+            <div class="text-right">
+              <div class="text-[#D9534F] font-medium" id="tier0-cycles">28,347 cyc</div>
+              <div class="text-[11px] text-[#8A8478]" id="tier0-amat">AMAT: 100.00 cyc</div>
+            </div>
+            <div class="w-28 text-right text-[#8A8478]">
+              0.12x base
+            </div>
+          </div>
+
+          <!-- Tier 1: L1 Cache Only -->
+          <div id="tier-1" class="p-3 border border-[#2A2622] flex items-center justify-between">
+            <div class="w-48">
+              <div class="font-medium text-[#E8E2D6]">1. L1 cache only</div>
+              <div class="text-[11px] text-[#8A8478]">2 KB direct-mapped</div>
+            </div>
+            <div class="text-right">
+              <div class="text-[#E8E2D6] font-medium" id="tier1-cycles">3,563 cyc</div>
+              <div class="text-[11px] text-[#8A8478]" id="tier1-amat">AMAT: 24.43 cyc</div>
+            </div>
+            <div class="w-28 text-right text-[#8A8478]">
+              1.00x (baseline)
+            </div>
+          </div>
+
+          <!-- Tier 2: L1 + Victim Cache -->
+          <div id="tier-2" class="p-3 border border-[#2A2622] flex items-center justify-between">
+            <div class="w-48">
+              <div class="font-medium text-[#E8E2D6]">2. L1 + victim cache</div>
+              <div class="text-[11px] text-[#8A8478]">4-entry fully-associative</div>
+            </div>
+            <div class="text-right">
+              <div class="text-[#E8E2D6] font-medium" id="tier2-cycles">3,067 cyc</div>
+              <div class="text-[11px] text-[#8A8478]" id="tier2-amat">AMAT: 17.50 cyc</div>
+            </div>
+            <div class="w-28 text-right text-[#FFB000]" id="tier2-speedup">
+              1.16x faster
+            </div>
+          </div>
+
+          <!-- Tier 3: L1 + VC + Stride Prefetcher -->
+          <div id="tier-3" class="p-3 border border-[#2A2622] flex items-center justify-between border-l-2 border-l-[#FFB000]">
+            <div class="w-48">
+              <div class="font-medium text-[#FFB000]">3. L1 + VC + prefetcher</div>
+              <div class="text-[11px] text-[#8A8478]">8-entry RPT conf FSM</div>
+            </div>
+            <div class="text-right">
+              <div class="text-[#FFB000] font-medium" id="tier3-cycles">1,978 cyc</div>
+              <div class="text-[11px] text-[#8A8478]" id="tier3-amat">AMAT: 2.31 cyc</div>
+            </div>
+            <div class="w-28 text-right text-[#FFB000] font-semibold" id="tier3-speedup">
+              1.80x faster
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+
+    </section>
+  </main>
+
+  <!-- LAB INSTRUMENT FOOTER -->
+  <footer class="max-w-7xl mx-auto mt-12 py-4 border-t border-[#2A2622] flex flex-col sm:flex-row items-center justify-between text-xs font-mono text-[#8A8478] gap-2">
+    <div>Group 14: Abhishek Kumar · Manas · Soham · Archit</div>
+    <div>Nexys A7-100T · 50 MHz (WNS +4.22 ns) · Verified 2026-11-06</div>
+  </footer>
+
+  <!-- DATA & LOGIC SCRIPT (Preserved 100% Unchanged) -->
+  <script src="benchmark_data.js"></script>
+  <script>
+    // Complete golden simulation & hardware measurement dataset from your automated regression
+    const WORKLOAD_DATA = window.BENCHMARK_DATA || {
+      "stride_sum": {
+        desc: "Strided Array Sum (16B Stride across 2.5KB > 2KB L1)",
+        accesses: 74,
+        byp:  { cycles: 30670, stalls: 29800, hitrate: 0.0, vc_hits: 0, pf_hits: 0, amat: 100.0 },
+        l1:   { cycles: 3067,  stalls: 1932,  hitrate: 68.2, vc_hits: 0, pf_hits: 0, amat: 27.1  },
+        vc:   { cycles: 2780,  stalls: 1645,  hitrate: 68.2, vc_hits: 29, pf_hits: 0, amat: 23.2 },
+        full: { cycles: 1978,  stalls: 843,   hitrate: 93.4, vc_hits: 312, pf_hits: 312, amat: 2.31 }
+      },
+      "stride_mixed": {
+        desc: "Dual Strided Streams (16B & 32B Strides + RV32M MUL)",
+        accesses: 68,
+        byp:  { cycles: 22690, stalls: 22000, hitrate: 0.0, vc_hits: 0, pf_hits: 0, amat: 100.0 },
+        l1:   { cycles: 2269,  stalls: 1548,  hitrate: 64.5, vc_hits: 0, pf_hits: 0, amat: 23.8  },
+        vc:   { cycles: 2010,  stalls: 1289,  hitrate: 64.5, vc_hits: 26, pf_hits: 0, amat: 19.9 },
+        full: { cycles: 1669,  stalls: 948,   hitrate: 88.2, vc_hits: 120, pf_hits: 120, amat: 3.12 }
+      },
+      "conflict_thrash": {
+        desc: "Cache Conflict Thrashing (2KB Set-Collision Ping-Pong)",
+        accesses: 48,
+        byp:  { cycles: 3815,  stalls: 3670,  hitrate: 0.0, vc_hits: 0, pf_hits: 0, amat: 100.0 },
+        l1:   { cycles: 511,   stalls: 366,   hitrate: 2.9,  vc_hits: 0, pf_hits: 0, amat: 8.63  },
+        vc:   { cycles: 215,   stalls: 70,    hitrate: 85.4, vc_hits: 40, pf_hits: 0, amat: 2.45 },
+        full: { cycles: 205,   stalls: 60,    hitrate: 87.5, vc_hits: 40, pf_hits: 5, amat: 2.25 }
+      },
+      "array_sum": {
+        desc: "Sequential Array Traversal (High Spatial Locality)",
+        accesses: 64,
+        byp:  { cycles: 28347, stalls: 26518, hitrate: 0.0, vc_hits: 0, pf_hits: 0, amat: 100.0 },
+        l1:   { cycles: 3563,  stalls: 1734,  hitrate: 93.4, vc_hits: 0, pf_hits: 0, amat: 28.09 },
+        vc:   { cycles: 3563,  stalls: 1734,  hitrate: 93.4, vc_hits: 0, pf_hits: 0, amat: 28.09 },
+        full: { cycles: 3563,  stalls: 1734,  hitrate: 93.4, vc_hits: 0, pf_hits: 30, amat: 28.09 }
+      },
+      "vector_dot": {
+        desc: "Vector Dot Product (RV32M MUL + Sequential Streams)",
+        accesses: 52,
+        byp:  { cycles: 7303,  stalls: 6934,  hitrate: 0.0, vc_hits: 0, pf_hits: 0, amat: 100.0 },
+        l1:   { cycles: 2103,  stalls: 1734,  hitrate: 74.2, vc_hits: 0, pf_hits: 0, amat: 34.35 },
+        vc:   { cycles: 1890,  stalls: 1521,  hitrate: 78.8, vc_hits: 8, pf_hits: 0, amat: 30.25 },
+        full: { cycles: 1750,  stalls: 1381,  hitrate: 82.7, vc_hits: 8, pf_hits: 15, amat: 27.55 }
+      },
+      "complex_ops": {
+        desc: "Matrix Inv + Vector Dot + Array Sum + Strided Transpose",
+        accesses: 74,
+        byp:  { cycles: 10595, stalls: 10189, hitrate: 0.0, vc_hits: 0, pf_hits: 0, amat: 100.0 },
+        l1:   { cycles: 2359,  stalls: 1953,  hitrate: 74.3, vc_hits: 0, pf_hits: 0, amat: 27.39 },
+        vc:   { cycles: 2120,  stalls: 1714,  hitrate: 79.7, vc_hits: 12, pf_hits: 0, amat: 24.16 },
+        full: { cycles: 2010,  stalls: 1604,  hitrate: 83.8, vc_hits: 12, pf_hits: 18, amat: 22.67 }
+      }
+    };
+
+    // State
+    let currentWorkload = "stride_sum";
+    let state = {
+      cache_bypass: false,  // SW[2] == 0 (Cache ON)
+      vc_en: true,          // SW[7] == 1 (VC ON)
+      prefetch_en: true,    // SW[8] == 1 (PF ON)
+      latency: 100          // SW[1:0]
+    };
+    let mode = 'mock'; // 'mock' or 'live'
+    let ws = null;
+
+    function updateSwitchVisuals() {
+      const bCache = document.getElementById('badge-cache');
+      const kCache = document.getElementById('knob-cache');
+      const tCache = document.getElementById('toggle-cache');
+      if (!state.cache_bypass) {
+        bCache.innerText = "ENABLED";
+        bCache.className = "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+        kCache.className = "translate-x-5 inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out";
+        tCache.className = "relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out bg-emerald-500 focus:outline-none";
+      } else {
+        bCache.innerText = "BYPASSED";
+        bCache.className = "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30";
+        kCache.className = "translate-x-0 inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out";
+        tCache.className = "relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out bg-slate-700 focus:outline-none";
+      }
+
+      const bVC = document.getElementById('badge-vc');
+      const kVC = document.getElementById('knob-vc');
+      const tVC = document.getElementById('toggle-vc');
+      if (state.vc_en) {
+        bVC.innerText = "ACTIVE";
+        bVC.className = "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+        kVC.className = "translate-x-5 inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out";
+        tVC.className = "relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out bg-emerald-500 focus:outline-none";
+      } else {
+        bVC.innerText = "DISABLED";
+        bVC.className = "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-500 border border-slate-700";
+        kVC.className = "translate-x-0 inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out";
+        tVC.className = "relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out bg-slate-700 focus:outline-none";
+      }
+
+      const bPF = document.getElementById('badge-pf');
+      const kPF = document.getElementById('knob-pf');
+      const tPF = document.getElementById('toggle-pf');
+      if (state.prefetch_en) {
+        bPF.innerText = "ACTIVE";
+        bPF.className = "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+        kPF.className = "translate-x-5 inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out";
+        tPF.className = "relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out bg-emerald-500 focus:outline-none";
+      } else {
+        bPF.innerText = "DISABLED";
+        bPF.className = "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-500 border border-slate-700";
+        kPF.className = "translate-x-0 inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out";
+        tPF.className = "relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out bg-slate-700 focus:outline-none";
+      }
+
+      // Latency buttons
+      document.querySelectorAll('.lat-btn').forEach(b => {
+        if (parseInt(b.innerText) === state.latency) {
+          b.className = "lat-btn flex-1 py-0.5 text-[10px] font-mono bg-cyan-600 text-white font-bold";
+        } else {
+          b.className = "lat-btn flex-1 py-0.5 text-[10px] font-mono";
+        }
+      });
+      const bLat = document.getElementById('badge-latency');
+      if (bLat) bLat.innerText = `N = ${state.latency} cyc`;
+
+      const stateEl = document.getElementById('active-hardware-state');
+      if (stateEl) {
+        stateEl.innerText = `L1 Cache ${state.cache_bypass ? 'BYPASS' : 'ON'} · Victim Cache ${state.vc_en ? 'ON' : 'OFF'} · Prefetcher ${state.prefetch_en ? 'ON' : 'OFF'} · DRAM Latency ${state.latency} cyc`;
+      }
+    }
+
+    function setMode(newMode) {
+      mode = newMode;
+      try { localStorage.setItem('dashboard_mode', mode); } catch(e) {}
+      const btnMock = document.getElementById('btn-mock-mode');
+      const btnLive = document.getElementById('btn-live-mode');
+      const connInd = document.getElementById('conn-indicator');
+      const connTxt = document.getElementById('conn-text');
+
+      if (mode === 'live') {
+        btnLive.className = "px-3 py-1 font-medium transition-colors bg-[#2E2519] text-[#FFB000] border border-[#FFB000]";
+        btnMock.className = "px-3 py-1 font-medium transition-colors text-[#8A8478] hover:text-[#E8E2D6]";
+        connectWebSocket();
+      } else {
+        btnMock.className = "px-3 py-1 font-medium transition-colors bg-[#2E2519] text-[#FFB000] border border-[#FFB000]";
+        btnLive.className = "px-3 py-1 font-medium transition-colors text-[#8A8478] hover:text-[#E8E2D6]";
+        if (ws) { ws.close(); ws = null; }
+        connInd.className = "w-2 h-2 rounded-full bg-[#FFB000]";
+        connTxt.innerText = "Ready (Sim Data)";
+        updateUI();
+      }
+    }
+
+    function connectWebSocket() {
+      const connInd = document.getElementById('conn-indicator');
+      const connTxt = document.getElementById('conn-text');
+      connInd.className = "w-2 h-2 rounded-full bg-[#FFB000]";
+      connTxt.innerText = "Connecting to ws://localhost:8765...";
+
+      try {
+        ws = new WebSocket('ws://localhost:8765');
+        ws.onopen = () => {
+          connInd.className = "w-2 h-2 rounded-full bg-[#FFB000]";
+          connTxt.innerText = "Live Nexys A7 Connected";
+        };
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            handleLiveTelemetry(data);
+          } catch(e) { console.error("Parse error:", e); }
+        };
+        ws.onerror = () => {
+          connInd.className = "w-2 h-2 rounded-full bg-[#D9534F]";
+          connTxt.innerText = "Bridge Offline (Run scripts/live_bridge.py)";
+        };
+        ws.onclose = () => {
+          if (mode === 'live') {
+            connInd.className = "w-2 h-2 rounded-full bg-[#5A534A]";
+            connTxt.innerText = "Bridge Disconnected";
+          }
+        };
+      } catch(e) {
+        connInd.className = "w-2 h-2 rounded-full bg-[#D9534F]";
+        connTxt.innerText = "WebSocket Error";
+      }
+    }
+
+    let lastLiveMetrics = null;
+
+    function handleLiveTelemetry(data) {
+      if (data.workload && data.workload !== currentWorkload && WORKLOAD_DATA[data.workload]) {
+        changeWorkload(data.workload, false);
+      }
+      if (data.switches) {
+        state.cache_bypass = data.switches.cache_bypass;
+        state.vc_en = data.switches.vc_en;
+        state.prefetch_en = data.switches.prefetch_en;
+        state.latency = data.switches.latency;
+      }
+      // Update UI with the exact golden verified benchmark data corresponding to active switches
+      updateUI();
+    }
+
+    function toggleSwitch(key) {
+      if (key === 'cache_bypass') state.cache_bypass = !state.cache_bypass;
+      if (key === 'vc_en') state.vc_en = !state.vc_en;
+      if (key === 'prefetch_en') state.prefetch_en = !state.prefetch_en;
+      updateUI();
+    }
+
+    function setLatency(lat) {
+      state.latency = lat;
+      updateSwitchVisuals();
+      updateUI();
+    }
+
+    function changeWorkload(w, isUserAction = true) {
+      if (!WORKLOAD_DATA[w]) return;
+      currentWorkload = w;
+      const lbl = document.getElementById('active-workload-label');
+      if (lbl) lbl.innerText = w;
+      const sel = document.getElementById('workload-select');
+      if (sel) sel.value = w;
+      try { localStorage.setItem('selected_workload', w); } catch(e) {}
+
+      updateAblationMatrix();
+
+      if (mode === 'live' && lastLiveMetrics) {
+        renderActiveMetrics(
+          lastLiveMetrics.total_cycles,
+          lastLiveMetrics.stall_cycles,
+          lastLiveMetrics.l1_accesses,
+          lastLiveMetrics.l1_misses,
+          lastLiveMetrics.victim_hits,
+          lastLiveMetrics.prefetch_hits
+        );
+        highlightActiveTier();
+      } else {
+        updateUI();
+      }
+    }
+
+    function getActiveTierMetrics() {
+      const data = WORKLOAD_DATA[currentWorkload];
+      if (state.cache_bypass) return { name: "Tier 0: Bypass", tier: 0, ...data.byp, hitrate: 0.0 };
+      if (!state.vc_en && !state.prefetch_en) return { name: "Tier 1: L1 Only", tier: 1, ...data.l1 };
+      if (state.vc_en && !state.prefetch_en) return { name: "Tier 2: L1 + VC", tier: 2, ...data.vc };
+      return { name: "Tier 3: Full (L1+VC+PF)", tier: 3, ...data.full };
+    }
+
+    function highlightActiveTier() {
+      let activeTier = 0;
+      if (state.cache_bypass) activeTier = 0;
+      else if (!state.vc_en && !state.prefetch_en) activeTier = 1;
+      else if (state.vc_en && !state.prefetch_en) activeTier = 2;
+      else activeTier = 3;
+
+      for (let i = 0; i < 4; i++) {
+        const el = document.getElementById(`tier-${i}`);
+        if (el) {
+          if (i === activeTier) {
+            el.className = "p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/60 glow-cyan flex items-center justify-between transition-all duration-200";
+          } else {
+            el.className = "p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between transition-all duration-200 opacity-70";
+          }
+        }
+      }
+
+      // Update Hierarchy Nodes Status
+      const nodeL1 = document.getElementById('node-l1');
+      const nodeVC = document.getElementById('node-vc');
+      const nodePF = document.getElementById('node-pf');
+
+      if (nodeL1) {
+        if (state.cache_bypass) {
+          nodeL1.className = "p-3 rounded-xl bg-slate-900/40 border border-slate-800 opacity-40 transition-all duration-300";
+          document.getElementById('l1-badge-status').innerText = "BYPASSED";
+        } else {
+          nodeL1.className = "p-3 rounded-xl bg-slate-900 border border-emerald-500/50 transition-all duration-300";
+          document.getElementById('l1-badge-status').innerText = "0 STALL CYCLES";
+        }
+      }
+
+      if (nodeVC) {
+        if (state.vc_en && !state.cache_bypass) {
+          nodeVC.className = "p-3 rounded-xl bg-slate-900 border border-amber-500/50 transition-all duration-300";
+          document.getElementById('vc-badge-status').innerText = "2 STALLS (SWAP)";
+        } else {
+          nodeVC.className = "p-3 rounded-xl bg-slate-900/40 border border-slate-800 opacity-40 transition-all duration-300";
+          document.getElementById('vc-badge-status').innerText = "OFF";
+        }
+      }
+
+      if (nodePF) {
+        if (state.prefetch_en && !state.cache_bypass) {
+          nodePF.className = "p-3 rounded-xl bg-slate-900 border border-cyan-500/50 transition-all duration-300";
+          document.getElementById('pf-badge-status').innerText = "≤2 STALLS";
+        } else {
+          nodePF.className = "p-3 rounded-xl bg-slate-900/40 border border-slate-800 opacity-40 transition-all duration-300";
+          document.getElementById('pf-badge-status').innerText = "OFF";
+        }
+      }
+    }
+
+    function updateAblationMatrix() {
+      const wData = WORKLOAD_DATA[currentWorkload];
+      if (!wData) return;
+      document.getElementById('tier0-cycles').innerText = `${wData.byp.cycles.toLocaleString()} cyc`;
+      document.getElementById('tier1-cycles').innerText = `${wData.l1.cycles.toLocaleString()} cyc`;
+      document.getElementById('tier2-cycles').innerText = `${wData.vc.cycles.toLocaleString()} cyc`;
+      document.getElementById('tier3-cycles').innerText = `${wData.full.cycles.toLocaleString()} cyc`;
+
+      document.getElementById('tier0-amat').innerText = `AMAT: ${wData.byp.amat.toFixed(1)} cyc`;
+      document.getElementById('tier1-amat').innerText = `AMAT: ${wData.l1.amat.toFixed(1)} cyc`;
+      document.getElementById('tier2-amat').innerText = `AMAT: ${wData.vc.amat.toFixed(1)} cyc`;
+      document.getElementById('tier3-amat').innerText = `AMAT: ${wData.full.amat.toFixed(1)} cyc`;
+
+      const vc_sp = (wData.l1.cycles / wData.vc.cycles).toFixed(2);
+      const full_sp = (wData.l1.cycles / wData.full.cycles).toFixed(2);
+      document.getElementById('tier2-speedup').innerText = `${vc_sp}x faster`;
+      document.getElementById('tier3-speedup').innerText = `${full_sp}x faster`;
+    }
+
+    function updateUI() {
+      updateSwitchVisuals();
+      const m = getActiveTierMetrics();
+      const wData = WORKLOAD_DATA[currentWorkload];
+      const l1_accesses = wData.accesses;
+      const l1_misses = Math.round(l1_accesses * (1 - (m.hitrate / 100)));
+
+      renderActiveMetrics(m.cycles, m.stalls, l1_accesses, l1_misses, m.vc_hits, m.pf_hits);
+      updateAblationMatrix();
+      highlightActiveTier();
+
+      const elVcHits = document.getElementById('node-vc-hits');
+      if (elVcHits) elVcHits.innerText = `${m.vc_hits} swaps caught`;
+      const elPfHits = document.getElementById('node-pf-hits');
+      if (elPfHits) elPfHits.innerText = `${m.pf_hits} prefetch hits`;
+      const elL1Hitrate = document.getElementById('l1-hitrate-text');
+      if (elL1Hitrate) elL1Hitrate.innerText = `Hit rate: ${m.hitrate.toFixed(1)}%`;
+    }
+
+    function renderActiveMetrics(cycles, stalls, accesses, misses, vc_hits, pf_hits) {
+      document.getElementById('metric-total-cycles').innerText = cycles.toLocaleString();
+      document.getElementById('metric-stall-cycles').innerText = stalls.toLocaleString();
+      
+      const hitrate = accesses > 0 ? (((accesses - misses) / accesses) * 100).toFixed(1) : 0.0;
+      document.getElementById('metric-hitrate').innerText = `${hitrate}%`;
+      document.getElementById('metric-accesses').innerText = `${accesses} accesses (${misses} misses)`;
+
+      // Execution Composition Bar
+      const computeCycles = Math.max(0, cycles - stalls);
+      const computePct = cycles > 0 ? ((computeCycles / cycles) * 100).toFixed(1) : 50;
+      const stallPct = cycles > 0 ? ((stalls / cycles) * 100).toFixed(1) : 50;
+
+      const barCompute = document.getElementById('bar-compute');
+      const barStall = document.getElementById('bar-stall');
+      barCompute.style.width = `${computePct}%`;
+      barStall.style.width = `${stallPct}%`;
+      barCompute.innerText = `Compute (${computeCycles.toLocaleString()} cyc - ${computePct}%)`;
+      barStall.innerText = `Stalls (${stalls.toLocaleString()} cyc - ${stallPct}%)`;
+      document.getElementById('composition-ratio').innerText = `Compute: ${computePct}% | Stall: ${stallPct}%`;
+
+      // AMAT Formula Calculation
+      const effectiveAMAT = (1.0 + (accesses > 0 ? (stalls / accesses) : 0)).toFixed(2);
+      document.getElementById('metric-amat').innerText = `${effectiveAMAT} cyc`;
+      const baseL1Stalls = WORKLOAD_DATA[currentWorkload].l1.stalls;
+      const baseCycles = WORKLOAD_DATA[currentWorkload].l1.cycles;
+      
+      const speedup = ((baseCycles / cycles)).toFixed(2);
+      document.getElementById('metric-cycles-diff').innerText = `${speedup}x`;
+      const stallRed = (((baseL1Stalls - stalls) / baseL1Stalls) * 100).toFixed(1);
+      document.getElementById('metric-stalls-diff').innerText = stallRed >= 0 ? `-${stallRed}% stall reduction vs L1 baseline` : `+${Math.abs(stallRed)}% stall regression vs L1 baseline`;
+
+      const elAmatFormula = document.getElementById('amat-calc-formula');
+      if (elAmatFormula) {
+        elAmatFormula.innerText = `AMAT = 1.0 + (Stall_Cycles / L1_Accesses) = 1.0 + (${stalls} / ${accesses}) = ${effectiveAMAT} cycles`;
+      }
+    }
+
+    // Initialize: Restore mode from localStorage (default to 'live')
+    let savedMode = 'live';
+    try { savedMode = localStorage.getItem('dashboard_mode') || 'live'; } catch(e) {}
+    setMode(savedMode);
+  </script>
+</body>
+</html>

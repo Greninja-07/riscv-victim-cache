@@ -42,3 +42,4 @@ reports/
 
 # Scratch directory
 scratch/
+top_fpga.bit
