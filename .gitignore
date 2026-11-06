@@ -25,7 +25,7 @@ __pycache__/
 *.log
 *.str
 *.dcp
-*.bit
+*.bin
 clockInfo.txt
 dfx_runtime.txt
 fsm_encoding.os
