@@ -80,3 +80,7 @@ set_property PACKAGE_PIN T14 [get_ports {an[5]}]
 set_property PACKAGE_PIN K2  [get_ports {an[6]}]
 set_property PACKAGE_PIN U13 [get_ports {an[7]}]
 set_property IOSTANDARD LVCMOS33 [get_ports an[*]]
+
+################ USB-UART INTERFACE (FTDI Bridge Pin D4) ################
+set_property PACKAGE_PIN D4 [get_ports uart_tx]
+set_property IOSTANDARD LVCMOS33 [get_ports uart_tx]

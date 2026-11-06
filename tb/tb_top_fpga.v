@@ -26,6 +26,7 @@ module tb_top_fpga;
     wire [6:0]  seg;
     wire [7:0]  an;
     wire        dp;
+    wire        uart_tx;
 
     // 100 MHz oscillator clock (10 ns period)
     always #5 clk = ~clk;
@@ -43,7 +44,8 @@ module tb_top_fpga;
         .led        (led),
         .seg        (seg),
         .an         (an),
-        .dp         (dp)
+        .dp         (dp),
+        .uart_tx    (uart_tx)
     );
 
     integer cycle_count;

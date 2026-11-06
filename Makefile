@@ -23,6 +23,7 @@ RTL_MEM    = rtl/mem
 RTL_VICTIM = rtl/victim
 RTL_PERF   = rtl/perf
 RTL_TOP    = rtl/top
+RTL_UART   = rtl/uart
 RTL_PREFETCH = rtl/prefetch
 TB_DIR     = tb
 SCRIPTS    = scripts
@@ -77,19 +78,19 @@ sim_system:
 		$(TB_DIR)/tb_system.v \
 		$(RTL_CORE)/pipeline.v $(RTL_CORE)/IF_ID.v $(RTL_CORE)/execute.v $(RTL_CORE)/muldiv.v $(RTL_CORE)/wb.v \
 		$(RTL_MEM)/memory.v $(RTL_MEM)/mem_subsystem.v $(RTL_MEM)/l1_cache_controller.v $(RTL_MEM)/main_memory.v \
-		$(RTL_VICTIM)/victim_cache.v $(RTL_PERF)/perf_profiler.v $(RTL_PREFETCH)/prefetcher.v
+		$(RTL_VICTIM)/victim_cache.v $(RTL_PERF)/perf_profiler.v $(RTL_PREFETCH)/prefetcher.v $(RTL_UART)/uart_tx.v $(RTL_UART)/uart_reporter.v
 	$(VVP) $(SIM_SYSTEM) +LATENCY=2 +CACHE_BYPASS=0 +MAXC=50000
 
 # Target: sim_top - Compile and run top-level Nexys A7 FPGA hardware testbench
 sim_top:
 	$(PYTHON) $(SCRIPTS)/build_workloads.py
 	$(PYTHON) -c "import shutil; shutil.copy('sw/array_sum_imem.hex', 'imem.hex'); shutil.copy('sw/array_sum_dmem.hex', 'dmem.hex'); shutil.copy('sw/array_sum_mem128.hex', 'mem128.hex')"
-	$(IVERILOG) -g2005 -I $(RTL_CORE) -I $(RTL_MEM) -I $(RTL_PERF) -I $(RTL_VICTIM) -I $(RTL_TOP) -I $(RTL_PREFETCH) -o $(SIM_TOP) \
+	$(IVERILOG) -g2005 -I $(RTL_CORE) -I $(RTL_MEM) -I $(RTL_PERF) -I $(RTL_VICTIM) -I $(RTL_TOP) -I $(RTL_PREFETCH) -I $(RTL_UART) -o $(SIM_TOP) \
 		$(TB_DIR)/tb_top_fpga.v \
 		$(RTL_TOP)/top_fpga.v \
 		$(RTL_CORE)/pipeline.v $(RTL_CORE)/IF_ID.v $(RTL_CORE)/execute.v $(RTL_CORE)/muldiv.v $(RTL_CORE)/wb.v \
 		$(RTL_MEM)/memory.v $(RTL_MEM)/mem_subsystem.v $(RTL_MEM)/l1_cache_controller.v $(RTL_MEM)/main_memory.v \
-		$(RTL_VICTIM)/victim_cache.v $(RTL_PERF)/perf_profiler.v $(RTL_PREFETCH)/prefetcher.v
+		$(RTL_VICTIM)/victim_cache.v $(RTL_PERF)/perf_profiler.v $(RTL_PREFETCH)/prefetcher.v $(RTL_UART)/uart_tx.v $(RTL_UART)/uart_reporter.v
 	$(VVP) $(SIM_TOP)
 
 # Target: sim_prefetcher - Compile and run Stride Prefetcher unit testbench

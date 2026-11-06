@@ -11,7 +11,16 @@ cd /d "%PROJ_DIR%"
 
 if "%~1"=="" goto MENU
 
-set "WORKLOAD=%~1"
+set "ARG=%~1"
+if "%ARG%"=="1" set "WORKLOAD=conflict_thrash" & goto COPY_FILES
+if "%ARG%"=="2" set "WORKLOAD=stride_sum" & goto COPY_FILES
+if "%ARG%"=="3" set "WORKLOAD=complex_ops" & goto COPY_FILES
+if "%ARG%"=="4" set "WORKLOAD=array_sum" & goto COPY_FILES
+if "%ARG%"=="5" set "WORKLOAD=vector_dot" & goto COPY_FILES
+if "%ARG%"=="6" set "WORKLOAD=rw_persistence" & goto COPY_FILES
+if "%ARG%"=="7" set "WORKLOAD=stride_mixed" & goto COPY_FILES
+
+set "WORKLOAD=%ARG%"
 goto COPY_FILES
 
 :MENU
@@ -60,7 +69,10 @@ copy /y "sw\%WORKLOAD%_imem.hex"   "imem.hex" >nul
 copy /y "sw\%WORKLOAD%_dmem.hex"   "dmem.hex" >nul
 copy /y "sw\%WORKLOAD%_mem128.hex" "mem128.hex" >nul
 
-echo [SUCCESS] Workload '%WORKLOAD%' is now staged in imem.hex and mem128.hex!
+if not exist "dashboard" mkdir "dashboard"
+echo {"workload": "%WORKLOAD%"} > "dashboard\active_workload.json"
+
+echo [SUCCESS] Workload '%WORKLOAD%' is now staged in imem.hex, mem128.hex, and active_workload.json!
 echo.
 set /p "REBUILD=Do you want to generate the bitstream now? (Y/N): "
 if /i "%REBUILD%"=="Y" (

@@ -35,7 +35,8 @@ module top_fpga #(
     output wire [15:0] led,          // 16 user LEDs
     output wire [6:0]  seg,          // 7-segment active-low cathodes
     output wire [7:0]  an,           // 8-digit active-low anodes
-    output wire        dp            // Decimal point cathode
+    output wire        dp,           // Decimal point cathode
+    output wire        uart_tx       // USB-UART Serial TX pin (D4)
 );
 
     // ------------------------------------------------------------------------
@@ -295,26 +296,57 @@ module top_fpga #(
     // Instantiate Hardware Performance Profiler & 7-Segment Display Driver
     // Runs on fast 100 MHz board clock for flicker-free display multiplexing
     // ------------------------------------------------------------------------
+    // Telemetry counter signals for live UART transmission
+    wire [31:0] prof_total_cycles;
+    wire [31:0] prof_stall_cycles;
+    wire [31:0] prof_l1_accesses;
+    wire [31:0] prof_l1_misses;
+    wire [31:0] prof_victim_hits;
+    wire [31:0] prof_prefetch_hits;
+
     perf_profiler #(
         .REFRESH_BITS(18) // ~190 Hz refresh at 50 MHz cpu_clk
     ) profiler_inst (
-        .clk         (cpu_clk),
-        .rst         (sys_rst),
-        .done        (done),
-        .mem_stall   (mem_stall),
-        .l1_access   (l1_access),
-        .l1_hit      (l1_hit),
-        .l1_miss     (l1_miss),
-        .victim_hit  (vc_hit),
-        .prefetch_hit(prefetch_hit),
-        .sw          (prof_sw),
-        .custom_val  (selected_op_result),
-        .split_mode  (split_mode),
-        .left_val    (left_display_val),
-        .seg         (seg),
-        .an          (an),
-        .dp          (dp),
-        .frozen      (frozen)
+        .clk              (cpu_clk),
+        .rst              (sys_rst),
+        .done             (done),
+        .mem_stall        (mem_stall),
+        .l1_access        (l1_access),
+        .l1_hit           (l1_hit),
+        .l1_miss          (l1_miss),
+        .victim_hit       (vc_hit),
+        .prefetch_hit     (prefetch_hit),
+        .sw               (prof_sw),
+        .custom_val       (selected_op_result),
+        .split_mode       (split_mode),
+        .left_val         (left_display_val),
+        .seg              (seg),
+        .an               (an),
+        .dp               (dp),
+        .frozen           (frozen),
+        .out_total_cycles (prof_total_cycles),
+        .out_stall_cycles (prof_stall_cycles),
+        .out_l1_accesses  (prof_l1_accesses),
+        .out_l1_misses    (prof_l1_misses),
+        .out_victim_hits  (prof_victim_hits),
+        .out_prefetch_hits(prof_prefetch_hits)
+    );
+
+    // Live UART Telemetry Engine for Web Dashboard (115200 baud, pin D4)
+    uart_reporter #(
+        .CLK_FREQ_HZ(100_000_000),
+        .REPORT_INTERVAL_CYCLES(5_000_000) // 20 Hz periodic telemetry
+    ) u_uart_reporter (
+        .clk          (clk),
+        .rst          (sys_rst),
+        .total_cycles (prof_total_cycles),
+        .stall_cycles (prof_stall_cycles),
+        .l1_accesses  (prof_l1_accesses),
+        .l1_misses    (prof_l1_misses),
+        .victim_hits  (prof_victim_hits),
+        .prefetch_hits(prof_prefetch_hits),
+        .sw           (sw),
+        .uart_tx_pin  (uart_tx)
     );
 
     // ------------------------------------------------------------------------

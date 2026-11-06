@@ -38,7 +38,13 @@ module perf_profiler #(
     output reg  [6:0]  seg,          // Active-low cathodes: {CG, CF, CE, CD, CC, CB, CA}
     output reg  [7:0]  an,           // Active-low digit anodes: an[7]=leftmost, an[0]=rightmost
     output wire        dp,           // Decimal point cathode (tied to 1'b1 = inactive/off)
-    output reg         frozen        // Sticky freeze flag: 1 once done is asserted, cleared on rst
+    output reg         frozen,
+    output wire [31:0] out_total_cycles,
+    output wire [31:0] out_stall_cycles,
+    output wire [31:0] out_l1_accesses,
+    output wire [31:0] out_l1_misses,
+    output wire [31:0] out_victim_hits,
+    output wire [31:0] out_prefetch_hits
 );
 
     // ------------------------------------------------------------------------
@@ -65,6 +71,13 @@ module perf_profiler #(
     reg [31:0] l1_misses;
     reg [31:0] victim_hits;
     reg [31:0] prefetch_hits;
+
+    assign out_total_cycles  = total_cycles;
+    assign out_stall_cycles  = stall_cycles;
+    assign out_l1_accesses   = l1_accesses;
+    assign out_l1_misses     = l1_misses;
+    assign out_victim_hits   = victim_hits;
+    assign out_prefetch_hits = prefetch_hits;
 
     // ------------------------------------------------------------------------
     // DONE-FREEZE & Event Counting Sequential Logic
