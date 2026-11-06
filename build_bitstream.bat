@@ -4,10 +4,16 @@ REM Build Script to Generate Bitstream using Vivado
 REM Target: Nexys A7 100T (top_fpga with Victim Cache & Profiler)
 REM ====================================================================
 
+REM Always ensure we are in the project root directory
+cd /d "%~dp0"
+
 echo [INFO] Checking Vivado installation...
 where vivado >nul 2>nul
 if %errorlevel% neq 0 (
-    if exist "D:\AMDDesignTools\2025.2\Vivado\bin\vivado.bat" (
+    if exist "C:\AMDDesignTools\2025.2\Vivado\bin\vivado.bat" (
+        echo [INFO] Found Vivado in C:\AMDDesignTools\2025.2\Vivado\bin
+        set "PATH=C:\AMDDesignTools\2025.2\Vivado\bin;%PATH%"
+    ) else if exist "D:\AMDDesignTools\2025.2\Vivado\bin\vivado.bat" (
         echo [INFO] Found Vivado in D:\AMDDesignTools\2025.2\Vivado\bin
         set "PATH=D:\AMDDesignTools\2025.2\Vivado\bin;%PATH%"
     ) else (
@@ -19,7 +25,7 @@ if %errorlevel% neq 0 (
 )
 
 echo [INFO] Running Vivado batch flow for bitstream generation...
-vivado -mode batch -nojournal -nolog -source scripts/vivado_bitstream.tcl
+call vivado -mode batch -nojournal -nolog -source scripts/vivado_bitstream.tcl
 
 if %errorlevel% equ 0 (
     echo.

@@ -296,9 +296,9 @@ module top_fpga #(
     // Runs on fast 100 MHz board clock for flicker-free display multiplexing
     // ------------------------------------------------------------------------
     perf_profiler #(
-        .REFRESH_BITS(19) // ~190 Hz refresh at 100 MHz
+        .REFRESH_BITS(18) // ~190 Hz refresh at 50 MHz cpu_clk
     ) profiler_inst (
-        .clk         (clk),
+        .clk         (cpu_clk),
         .rst         (sys_rst),
         .done        (done),
         .mem_stall   (mem_stall),

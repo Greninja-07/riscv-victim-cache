@@ -55,6 +55,7 @@ module main_memory #(
     reg [DATA_WIDTH-1:0] latched_wdata;
     reg latched_we;
 
+
     wire [$clog2(MEM_DEPTH)-1:0] block_idx = latched_addr[$clog2(MEM_BYTES)-1:4]; // 16-byte block index
 
     // Dynamic latency decoding from board switches
@@ -130,7 +131,6 @@ module main_memory #(
                         latched_we    <= mem_we;
 
                         if (active_latency <= 1) begin
-                            // Fast 1-cycle acknowledgment (N = 1 baseline)
                             mem_ack <= 1'b1;
                         end else begin
                             counter <= active_latency - 1;
